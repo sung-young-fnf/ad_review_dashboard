@@ -81,14 +81,15 @@ prompt_select() {
 # ─── Replace placeholders ───
 replace_placeholders() {
   local file="$1"
-  local sed_cmd="sed"
-  local sed_flag="-i"
-  [[ "$(uname)" == "Darwin" ]] && sed_flag="-i ''"
+  # 루트 package.json에서 프로젝트명 추출
+  local project_name
+  project_name=$(grep '"name"' "$ROOT_DIR/package.json" | head -1 | sed 's/.*"\(.*\)".*/\1/' | sed 's/.*: *"//' | sed 's/".*//')
 
   if [[ "$(uname)" == "Darwin" ]]; then
     sed -i '' \
       -e "s/{{APP_NAME}}/$APP_NAME/g" \
       -e "s/{{APP_NAME_SNAKE}}/$APP_SNAKE/g" \
+      -e "s/{{PROJECT_NAME}}/$project_name/g" \
       -e "s/{{BACKEND_PORT}}/8000/g" \
       -e "s/{{FRONTEND_PORT}}/$FRONTEND_PORT/g" \
       -e "s/{{SSO_ENABLED}}/$SSO_ENABLED/g" \
@@ -97,6 +98,7 @@ replace_placeholders() {
     sed -i \
       -e "s/{{APP_NAME}}/$APP_NAME/g" \
       -e "s/{{APP_NAME_SNAKE}}/$APP_SNAKE/g" \
+      -e "s/{{PROJECT_NAME}}/$project_name/g" \
       -e "s/{{BACKEND_PORT}}/8000/g" \
       -e "s/{{FRONTEND_PORT}}/$FRONTEND_PORT/g" \
       -e "s/{{SSO_ENABLED}}/$SSO_ENABLED/g" \
@@ -223,7 +225,7 @@ if [[ "$BACKEND_TYPE" == "fastapi" ]]; then
   fi
 fi
 
-find "$APP_DIR/backend" -type f \( -name "*.py" -o -name "*.toml" -o -name "*.ini" -o -name "*.json" -o -name "*.ts" -o -name "*.env*" -o -name "*.yaml" -o -name "*.yml" -o -name "*.mako" -o -name "*.sql" -o -name "*.prisma" \) | while read -r f; do
+find "$APP_DIR/backend" -type f \( -name "*.py" -o -name "*.toml" -o -name "*.ini" -o -name "*.json" -o -name "*.ts" -o -name "*.env*" -o -name "*.yaml" -o -name "*.yml" -o -name "*.mako" -o -name "*.sql" -o -name "*.prisma" -o -name "*.sh" -o -name "Dockerfile" \) | while read -r f; do
   replace_placeholders "$f"
 done
 
@@ -232,7 +234,7 @@ echo "🎨 Frontend (Next.js 16)..."
 mkdir -p "$APP_DIR/frontend"
 cp -r "$TEMPLATE_DIR/nextjs/"* "$APP_DIR/frontend/"
 
-find "$APP_DIR/frontend" -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.json" -o -name "*.js" -o -name "*.css" \) | while read -r f; do
+find "$APP_DIR/frontend" -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.json" -o -name "*.js" -o -name "*.css" -o -name "Dockerfile" -o -name "*.env*" \) | while read -r f; do
   replace_placeholders "$f"
 done
 
