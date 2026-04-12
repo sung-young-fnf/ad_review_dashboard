@@ -1,10 +1,13 @@
-namespace: {{APP_NAME_SNAKE}}
+global:
+  namespace: {{APP_NAME_SNAKE}}
+  environment: dev
 
 backend:
   replicaCount: 1
   image:
     repository: ""
     tag: latest
+    pullPolicy: IfNotPresent
   port: 8000
   resources:
     requests:
@@ -14,13 +17,30 @@ backend:
       cpu: 500m
       memory: 512Mi
   env: []
+  # DB migration (initContainer)
+  migration:
+    enabled: true
+    command: []  # FastAPI: ["uv", "run", "alembic", "upgrade", "head"] / NestJS: ["npx", "prisma", "migrate", "deploy"]
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 30
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 5
+    periodSeconds: 10
 
 frontend:
   replicaCount: 1
   image:
     repository: ""
     tag: latest
-  port: {{FRONTEND_PORT}}
+    pullPolicy: IfNotPresent
+  port: 3000
   resources:
     requests:
       cpu: 100m
@@ -31,8 +51,31 @@ frontend:
   env:
     - name: BACKEND_URL
       value: "http://{{APP_NAME}}-backend:8000"
+  livenessProbe:
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 30
+    periodSeconds: 30
+  readinessProbe:
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 10
+    periodSeconds: 10
 
 ingress:
   enabled: true
+  className: nginx
   host: {{APP_NAME}}.fnf.co.kr
-  tls: true
+  tls:
+    enabled: true
+    secretName: {{APP_NAME}}-tls
+
+# HPA (Horizontal Pod Autoscaler)
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilization: 70
+  targetMemoryUtilization: 80

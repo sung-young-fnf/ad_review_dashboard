@@ -20,4 +20,16 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
 
-  # Python backend jobs are added per-app via deploy-{app}-backend.yml
+  # Python backend lint (FastAPI 앱이 있을 때)
+  python-lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: []  # 앱 추가 시 여기에 등록: [s3gate, another-app]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: |
+          cd apps/${{ matrix.app }}/backend
+          uv sync --frozen
+          uv run ruff check src/

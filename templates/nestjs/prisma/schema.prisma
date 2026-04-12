@@ -1,5 +1,8 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // 멀티앱 충돌 방지: 앱별 독립 output 경로
+  output          = "../src/generated/prisma-client"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
@@ -10,4 +13,16 @@ datasource db {
 }
 
 // 모델 정의는 여기부터 추가
-// 모든 모델에 @@schema("{{APP_NAME_SNAKE}}") 필수
+// 모든 모델에 반드시 @@schema("{{APP_NAME_SNAKE}}") 추가
+// 필드명 camelCase, DB 컬럼 snake_case → @map("snake_case")
+//
+// 예시:
+// model User {
+//   id        String   @id @default(uuid())
+//   email     String   @unique
+//   name      String?
+//   createdAt DateTime @default(now()) @map("created_at")
+//
+//   @@map("users")
+//   @@schema("{{APP_NAME_SNAKE}}")
+// }

@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     database_url_sync: str = "postgresql://{{APP_NAME_SNAKE}}_svc:changeme@localhost:5432/{{APP_NAME_SNAKE}}_db"
     db_schema: str = "{{APP_NAME_SNAKE}}"
 
+    # Connection Pool
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    db_pool_timeout: int = 30
+    db_pool_recycle: int = 1800  # 30분 — RDS idle timeout 대비
+
     # JWT
     jwt_secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
