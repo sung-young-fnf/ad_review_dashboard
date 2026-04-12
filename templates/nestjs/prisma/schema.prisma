@@ -1,6 +1,5 @@
 generator client {
   provider        = "prisma-client-js"
-  // 멀티앱 충돌 방지: 앱별 독립 output 경로
   output          = "../src/generated/prisma-client"
   previewFeatures = ["multiSchema"]
 }
@@ -8,21 +7,108 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  // DBUSER 정책: 전용 스키마, public 금지
   schemas  = ["{{APP_NAME_SNAKE}}"]
 }
 
-// 모델 정의는 여기부터 추가
-// 모든 모델에 반드시 @@schema("{{APP_NAME_SNAKE}}") 추가
-// 필드명 camelCase, DB 컬럼 snake_case → @map("snake_case")
-//
-// 예시:
-// model User {
-//   id        String   @id @default(uuid())
-//   email     String   @unique
-//   name      String?
-//   createdAt DateTime @default(now()) @map("created_at")
-//
-//   @@map("users")
-//   @@schema("{{APP_NAME_SNAKE}}")
-// }
+// ─── Built-in: User (SSO 자동등록) ─────────────────────
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String?
+  entraObjectId String?   @unique @map("entra_object_id")
+  department    String?
+  status        String    @default("active") // active | inactive
+  isAdmin       Boolean   @default(false) @map("is_admin")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  lastLoginAt   DateTime? @map("last_login_at")
+
+  roles      UserRole[]
+  auditLogs  AuditLog[]
+
+  @@map("users")
+  @@schema("{{APP_NAME_SNAKE}}")
+}
+
+// ─── Built-in: Role (RBAC) ─────────────────────────────
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  users       UserRole[]
+  menus       MenuPermission[]
+
+  @@map("roles")
+  @@schema("{{APP_NAME_SNAKE}}")
+}
+
+model UserRole {
+  userId String @map("user_id")
+  roleId String @map("role_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+  @@schema("{{APP_NAME_SNAKE}}")
+}
+
+// ─── Built-in: Menu (동적 사이드바) ────────────────────
+
+model Menu {
+  id           String   @id @default(uuid())
+  menuKey      String   @unique @map("menu_key")
+  label        String
+  icon         String?
+  route        String?
+  parentId     String?  @map("parent_id")
+  displayOrder Int      @default(0) @map("display_order")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  parent      Menu?            @relation("MenuHierarchy", fields: [parentId], references: [id])
+  children    Menu[]           @relation("MenuHierarchy")
+  permissions MenuPermission[]
+
+  @@map("menus")
+  @@schema("{{APP_NAME_SNAKE}}")
+}
+
+model MenuPermission {
+  id              String  @id @default(uuid())
+  menuId          String  @map("menu_id")
+  roleId          String  @map("role_id")
+  canView         Boolean @default(true) @map("can_view")
+
+  menu Menu @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([menuId, roleId])
+  @@map("menu_permissions")
+  @@schema("{{APP_NAME_SNAKE}}")
+}
+
+// ─── Built-in: Audit Log ───────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  action    String
+  resource  String?
+  detail    Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@map("audit_logs")
+  @@schema("{{APP_NAME_SNAKE}}")
+}
+
+// ─── 앱별 모델은 여기부터 추가 ─────────────────────────
+// 예시: model Example { ... @@schema("{{APP_NAME_SNAKE}}") }
