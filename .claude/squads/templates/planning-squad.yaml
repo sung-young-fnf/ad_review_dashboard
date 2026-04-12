@@ -1,0 +1,102 @@
+# Planning Squad - Epic/Story 기획 품질 강화를 위한 2-3인 편대
+# 사용: 대형 Epic 기획, 크로스 도메인 Story 설계, UX 관련 기획
+# WHY: EP135/136에서 7/8 Story가 이미 구현됨 — 코드 검증 없는 기획이 원인
+name: planning-squad
+scale: PLANNING
+description: "Epic/Story 생성 단계에서 코드 검증 + UX 관점을 병렬 분석하는 기획 전용 편대"
+team_size: 2-3
+estimated_time: "30분-2시간"
+trigger_keywords: [epic, 대형, 크로스도메인, 불명확, 기획, 설계]
+
+# Hybrid 모드: Pre-Flight Scanner(경량) vs Full Planning Squad
+modes:
+  preflight:
+    description: "모든 Epic에 기본 적용 — Code Scanner만 Solo로 실행"
+    cost_multiplier: 1.3x
+    condition: "Epic 생성 시 항상"
+    roles: [code-scanner]
+  full:
+    description: "트리거 조건 충족 시 — 전체 Planning Squad 편성"
+    cost_multiplier: 2.5x
+    condition: "아래 트리거 조건 참조"
+    roles: [planner, code-scanner, ux-advisor]
+
+# Full Planning Squad 트리거 조건 (하나라도 충족 시)
+full_squad_triggers:
+  - "Story 예상 5개+"
+  - "크로스 도메인 (Backend + Frontend 동시 수정)"
+  - "UX 영향 있음 (User Impact: Yes + Quick-Pass 아님)"
+  - "범위 불명확 ('개선해줘', '리팩토링해줘' 등 모호한 요청)"
+  - "기존 코드 재사용 가능성 높음 (유사 기능 존재)"
+
+roles:
+  - name: planner
+    agent_type: "general-purpose"
+    role: LEAD
+    system_prompt_ref: ".claude/squads/roles/planner.md"
+    responsibilities:
+      - "Epic Goal State 정의 및 Story 분해 조율"
+      - "Code Scanner + UX Advisor 분석 결과 종합"
+      - "최종 Epic/Story 문서 생성 (docs/epics/ 형식)"
+      - "이미 구현된 기능 제거, UX AC 보강"
+      - "story-validator / task-planner 체인 트리거"
+
+  - name: code-scanner
+    agent_type: "Explore"
+    role: MEMBER
+    system_prompt_ref: ".claude/squads/roles/code-scanner.md"
+    responsibilities:
+      - "기존 구현 전수 검사 (Grep/Glob/serena)"
+      - "'이미 구현됨' 목록 작성 → Planner에게 보고"
+      - "재사용 가능 패턴/유틸리티 식별"
+      - "파일 의존성 그래프 분석 (영향 범위 추정)"
+
+  - name: ux-advisor
+    agent_type: "general-purpose"
+    role: MEMBER
+    optional: true
+    condition: "UX 영향 있는 Epic일 때만 (User Impact: Yes)"
+    system_prompt_ref: ".claude/squads/roles/ux-advisor.md"
+    responsibilities:
+      - "Story별 UX 영향 평가 (Nielsen Heuristics 관점)"
+      - "AC에 UX 기준 추가 제안"
+      - "정보 계층/사용자 흐름 검토"
+      - "UX 관련 Story 누락 여부 확인"
+
+task_flow:
+  - step: 1
+    actor: planner
+    action: "요구사항 분석 → 초기 Epic 구조 + Story 목록 초안 작성"
+  - step: 2a
+    actor: code-scanner
+    action: "(병렬) 코드베이스 전수 스캔 → '이미 구현됨' 보고서 + 재사용 패턴 목록"
+    parallel: true
+  - step: 2b
+    actor: ux-advisor
+    action: "(병렬) Story별 UX 영향 분석 → AC 보강 제안서"
+    parallel: true
+  - step: 3
+    actor: planner
+    action: "Scanner/Advisor 결과 종합 → Story 수정 (구현된 것 제거, UX AC 추가)"
+  - step: 4
+    actor: planner
+    action: "최종 Epic/Story 문서 생성 → story-validator 체인 트리거"
+
+completion_condition:
+  - "Epic 문서 + 모든 Story 문서 생성 완료"
+  - "Code Scanner 보고서: 모든 Story가 '구현 필요' 확인됨"
+  - "(UX 포함 시) UX Advisor 검토 완료 + AC 반영"
+  - "story-validator 통과"
+
+cost_multiplier: 2.5x
+
+# Pre-Flight Scanner (Solo 모드에서도 항상 실행)
+preflight_flow:
+  description: "epic-creator Solo 실행 전에 Code Scanner를 먼저 실행"
+  flow:
+    - step: 0
+      actor: code-scanner
+      action: "Grep/Glob으로 Epic 관련 키워드 전수 검사 → '이미 구현됨' 보고서"
+    - step: 1
+      actor: epic-creator
+      action: "Scanner 보고서를 참고하여 Epic/Story 생성 (Solo)"

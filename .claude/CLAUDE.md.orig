@@ -1,0 +1,155 @@
+# Claude Code Rules (Universal)
+
+> Think carefully. Concise solutions. Minimal changes. Korean.
+
+## First Response (필수)
+```
+🛑 STOP → 🔍 ANALYZE → 🎯 USER IMPACT → ✅ ROUTE
+Intent: [요청 요약]
+User Impact: [Yes/No - 사용자가 직접 경험하는가?]
+Quick-Pass: [CI/CD|Docker|K8s|린터|포매터|빌드설정] → 순수 인프라만 바로 해당 agent
+UX Gateway: [Yes/No] ← User Impact Yes + Quick-Pass 아님 → 반드시 Yes
+Domain: [frontend|backend|db|general|ux|unclear]
+Code-Change: [none|minor(1-4줄)|major(5줄+)]
+
+📊 Scale 판단: (기본값: Squad + multi-model)
+- 키워드: [매칭된 키워드] → [EPIC|STORY|BUG_CRITICAL|DB|UX|SOLO]
+- 병렬 가능성: [순차 의존 / 병렬 가능]
+- 역할 다양성: [단일 도메인 / 다역할 필요]
+- +multi-model: **Yes (기본값)** — Codex/Gemini **둘 다** 항상 참여. "solo만" 명시 시에만 비활성화
+- Squad 기본값: Code-Change minor(1-4줄) → Solo, **나머지 전부 Squad**
+
+Scope: [전체/부분 — 불확실하면 "확인 필요"]
+
+✅ ROUTE: [Squad + multi-model] → [선택한 squad/agent]
+  Codex delegate: [역할명] ← 반드시 1개+ (codex-delegate Agent 생성)
+  Gemini delegate: [역할명] ← 반드시 1개+ (gemini-delegate Agent 생성)
+  WHY: [선택 근거 1문장]
+  Solo 조건: Code-Change minor(1-4줄) 또는 사용자 "solo만" 명시
+```
+❌ 템플릿 없이 Read/Grep = VIOLATION
+❌ Code-Change: major인데 code-writer 미사용 = VIOLATION
+❌ User Impact 자문 없이 바로 코드 작성 = VIOLATION (Quick-Pass 제외)
+❌ ROUTE 판단 근거(WHY) 없이 agent 실행 = VIOLATION
+❌ UX Gateway: Yes인데 UX agent 미호출 = VIOLATION (Code-Change: none이어도 UX 검토 필수)
+❌ "제안/설계/기획"을 LLM이 직접 수행하고 UX agent 미위임 = VIOLATION (제안도 UX 전문 분석 필수)
+❌ +multi-model: Yes인데 Codex/Gemini delegate 중 하나라도 미생성 = VIOLATION (둘 다 필수, Explore agent는 Claude이므로 대체 불가)
+❌ Epic/Story .md 파일 Write 직후 `plannotator annotate` 미실행 = VIOLATION (기획 산출물은 시각적 검토 필수)
+
+## Bug Diagnosis First (버그 리포트 시 필수)
+> WHY: wrong_approach 133건 — "진단 없이 수정 시도"가 최대 마찰 원인 (Insights 2026-02)
+> "왜 X가 안 돼?" → 바로 수정 시도 → 잘못된 수정 → 사용자 교정 패턴 반복
+
+**버그/이슈 리포트 수신 시:**
+1. **진단 먼저, 수정 나중** — 코드 변경 전에 근본 원인을 파일:라인 수준으로 특정
+2. **실행/호출 금지** — 문제가 되는 기능을 직접 실행하지 말고, 코드를 추적하여 분석
+3. **과거 지식 검색** — `historian/get_error_solutions` + `Grep docs/solutions/` 먼저
+4. **수정 방안 제시 후 승인 대기** — 사용자 "ㄱ/go" 후에만 수정 진행
+5. **`/diagnose` 스킬 사용 권장** — 진단 전용 모드로 코드 변경 원천 차단
+
+❌ 버그 리포트에 바로 Edit/Write 사용 = VIOLATION
+❌ "~가 없다" 단정 후 새로 만들기 = VIOLATION (Grep으로 검증 필수)
+
+## Pre-Flight Protocol (2파일+ 또는 모호한 요청 시 필수)
+> WHY: wrong_approach 133건 + misunderstood_request 79건 — 의도 오해가 최대 마찰 원인 (Insights 2026-02)
+> 버그 수정 요청을 분석 작업으로 오해하거나, UX 의도를 다른 기능으로 변질시키는 패턴 방지
+
+코드 작성 전 **반드시** 아래 블록을 출력하고 사용자 확인 후 진행:
+```
+**내 이해:** [사용자 요청 1문장 재진술]
+**접근법:** [기술 전략 1-2문장]
+**수정 파일:** [구체적 파일 목록]
+**범위 밖:** [하지 않을 것]
+**완료 기준:** [성공 검증 방법]
+```
+- 사용자 "go/ㄱ/진행" 후 실행. 수정 시 재확인.
+- **예외**: 1-4줄 minor 수정, 문서 수정, Quick-Pass 인프라 작업은 Pre-Flight 생략 가능
+
+### Reference Expansion Rule (레퍼런스 제공 시 필수)
+> WHY: 백엔드 레퍼런스만 제공 → 백엔드만 구현 → 사용자가 프론트엔드 추가 요청 반복 (커밋 로그 2026-03 분석)
+> 레퍼런스 = 참고 코드일 뿐, 작업 범위를 한정하지 않는다
+
+- **레퍼런스 범위 ≠ 작업 범위** — 레퍼런스가 백엔드 코드여도 기능 추가면 BE+BFF+FE 전체 범위
+- Pre-Flight **수정 파일** 목록에 반드시 Backend + BFF Route + Frontend 컴포넌트 포함
+- 한쪽만 있으면 사용자에게 "프론트엔드/백엔드도 포함할까요?" 확인
+- ❌ 레퍼런스가 백엔드라서 백엔드만 구현 = VIOLATION
+- ❌ "프론트엔드는 별도로 진행하겠습니다" 단독 판단 = VIOLATION (사용자 승인 필수)
+
+## Agent Routing
+- Code-Change: major(5줄+) → code-writer 필수
+- UX Gateway: User Impact Yes + Quick-Pass 아님 → UX agent 필수
+- Squad: SOLO(1-4줄 minor) 외 전부 Squad + multi-model
+- Quick Pass: CI/CD, Docker, K8s, ESLint, tsconfig 등 순수 인프라
+- feat 완료 = Backend + BFF + Frontend 전부 (한쪽만 금지)
+
+## Scope & Trust Rules
+
+### Scope 확인 (Over-Scoping 방지)
+> WHY: 6개 탭 전부 계획했는데 3개만 필요한 사례 반복 — 범위 초과 = 시간 낭비
+
+- 대형 기능 구현 전 **"전체 vs 부분? 어디까지?"** 확인
+- 사용자가 명시하지 않은 기능은 구현하지 않음
+- 불확실하면 5줄 계획 먼저 보여주고 승인 대기
+
+### 탐색 시간 제한 (Exploration Cap)
+> WHY: 탐색만 하다 세션 종료되는 패턴 반복 — Orbit MCP 복제, Axiomeer 분석 등
+
+- 탐색/계획은 **최대 5분** → 이후 반드시 코드 변경 시작
+- 5분 초과 시 중간 요약 보고 + 사용자 확인 ("계속 분석? 구현 시작?")
+- "분석만" 명시 요청이 아닌 한, **코드를 먼저 작성**
+- ❌ 전체 세션을 탐색+계획 문서 작성으로 소진 = VIOLATION
+
+### 문서 vs 코드 신뢰도 (MANDATORY — 강제 실행)
+> WHY: PROGRESS.md 0%인데 실제 코드 90% 완료 사례 + EP135/EP136에서 8개 Story 중 7개 이미 구현 발견 (2026-02-12)
+> 규칙이 있어도 지켜지지 않았던 원인: "권고"로만 존재 → "강제 Gate"로 승격
+
+- **코드 > 문서** — 진행률/상태 판단은 실제 소스코드 기준
+- PROGRESS.md, epic tracker 등은 참고만, 최종 판단은 Grep/Glob으로 검증
+- 문서와 코드가 불일치하면 코드가 진실
+
+**🔴 Epic/Story 생성 전 코드 검증 Gate (BLOCKING)**:
+- Epic/Story에 "새로 구현할 기능" 작성 전 **반드시 `Grep`으로 기존 구현 확인**
+- ❌ 검증 없이 "AS-IS: 불가능 / TO-BE: 구현" 작성 = VIOLATION
+- ✅ `Grep {키워드}` → 기존 코드 발견 → "✅ ALREADY IMPLEMENTED" 표시
+- ✅ `Grep {키워드}` → 미발견 → "구현 필요" 확인 후 Story 작성
+- 이 Gate를 통과하지 않은 Epic/Story는 생성 금지
+
+### Verify Before Claiming (주장 전 검증)
+> WHY: "~가 없다" 잘못된 확신 → 사용자가 직접 반박해야 하는 사례 반복
+
+- **"없다/존재하지 않는다/구현되지 않았다"** 주장 전 반드시 `Grep`/`Glob`으로 검증
+- 문서 기반 진행률 보고 금지 → 실제 코드 기반으로만 보고
+- 확신이 없으면 **"확인 필요"**로 표기, 단정적 부정 금지
+
+### Orbit→AI Agent 복제 규칙
+> WHY: 복제 대신 자체 해석 구현 → 세션 낭비 반복 (6+ 세션)
+
+- Orbit 소스코드를 **먼저 읽고 전체 맵핑** 후 구현
+- 자체 개선/재해석 금지 — 사용자가 명시적으로 요청하지 않는 한 원본 충실 복제
+- 스킬: `/orbit-replicate` 사용 권장
+
+## Absolute Rules
+> Kent Beck + Karpathy 4 Principles
+
+**YAGNI** | **DRY** | **NO PARTIAL** | **NO DEAD CODE** | **NO OVER-ENGINEERING** | **NO INFINITE LOOPS** (useEffect primitive만)
+
+## 🔧 Tool Preference (2.1.31+)
+
+| ❌ Bash 대신 | ✅ 전용 도구 |
+|-------------|-------------|
+| `cat file` | `Read` |
+| `sed -i` | `Edit` |
+| `grep -r` | `Grep` |
+| `find . -name` | `Glob` |
+
+## Post-Change Checklist (코드 수정 후 필수)
+1. **TypeScript 체크**: `pnpm tsc --noEmit` (에러 있으면 즉시 수정)
+2. **Backend DTO 변경 시**: OpenAPI 타입 재생성 필수
+3. **커밋 전 사용자 확인** (자동 커밋 금지)
+
+## Guides (Scout Pattern — INDEX 먼저, 필요한 것만 Read)
+- **INDEX**: `.claude/guides/INDEX.md` — 57개 가이드 키워드 인덱스 (이것만 먼저 읽기)
+- Squad 편성: `.claude/squads/README.md`
+
+## Tone
+Be concise, be skeptical. No flattery. Ask if in doubt.

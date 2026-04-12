@@ -1,0 +1,65 @@
+# DB Squad - 데이터베이스 스키마 변경을 위한 2인 편대
+# 사용: 스키마 변경, 마이그레이션, 테이블/컬럼 추가
+name: db-squad
+scale: DB
+description: "안전한 DB 스키마 변경을 위한 architect + implementer 2인 편대"
+team_size: 2
+estimated_time: "1-4시간"
+trigger_keywords: [스키마, 마이그레이션, DDL, 테이블, 컬럼, DB]
+
+roles:
+  - name: db-architect
+    agent_type: "general-purpose"
+    role: LEAD
+    system_prompt_ref: ".claude/squads/roles/db-architect.md"
+    responsibilities:
+      - "현재 스키마 분석 (prisma.schema / Alembic versions)"
+      - "마이그레이션 계획 수립 (순서, 의존성, 롤백 전략)"
+      - "DB enum 사용 금지 규칙 검증 (VarChar + TS union type)"
+      - "mcp_orch 스키마 사용 확인 (public 스키마 금지)"
+      - "데이터 무결성 제약조건 검증"
+
+  - name: db-dev
+    agent_type: "04-implementation/db-code-writer"
+    role: MEMBER
+    system_prompt_ref: ".claude/squads/roles/db-dev.md"
+    responsibilities:
+      - "Alembic 마이그레이션 파일 생성"
+      - "SQLAlchemy 모델 코드 수정"
+      - "prisma generate (필요 시)"
+      - "마이그레이션 정방향/역방향 테스트"
+
+task_flow:
+  - step: 1
+    actor: db-architect
+    action: "현재 스키마 분석 → 변경 영향 범위 파악"
+  - step: 2
+    actor: db-architect
+    action: |
+      마이그레이션 계획 수립:
+        - 변경할 테이블/컬럼 목록
+        - 의존성 순서 (FK 관계 고려)
+        - 롤백 전략 (downgrade 스크립트)
+        - DB 규칙 검증: enum 미사용, mcp_orch 스키마, 암호화 필드
+  - step: 3
+    actor: db-dev
+    action: "Alembic revision --autogenerate → 마이그레이션 파일 생성"
+  - step: 4
+    actor: db-dev
+    action: "SQLAlchemy 모델 수정 → 타입 일치 확인"
+  - step: 5
+    actor: db-architect
+    action: "마이그레이션 파일 리뷰 → 데이터 손실 위험 검증"
+  - step: 6
+    actor: db-dev
+    action: "alembic upgrade head → alembic downgrade -1 → 양방향 테스트"
+
+completion_condition:
+  - "alembic upgrade head 성공"
+  - "alembic downgrade -1 성공 (롤백 가능)"
+  - "SQLAlchemy 모델과 DB 스키마 일치"
+  - "public 스키마 미사용 (mcp_orch 스키마만)"
+  - "DB enum 미사용 (VarChar + 코드 레벨 validation)"
+  - "pnpm build 성공 (프론트엔드 타입 영향 확인)"
+
+cost_multiplier: 2x

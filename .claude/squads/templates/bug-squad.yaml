@@ -1,0 +1,82 @@
+# Bug Squad - 긴급 장애 대응을 위한 가설 병렬 검증 편대
+# 사용: P0 장애, 서비스 다운, Critical 버그
+name: bug-squad
+scale: BUG_CRITICAL
+description: "가설 병렬 검증으로 긴급 버그를 최단 시간에 해결하는 편대"
+team_size: 2-3
+estimated_time: "30분-4시간"
+trigger_keywords: [긴급, P0, 장애, 서비스다운, critical]
+
+roles:
+  - name: investigator-1
+    agent_type: "04-implementation/code-writer"
+    role: LEAD
+    system_prompt_ref: ".claude/squads/roles/bug-investigator.md"
+    spawn_options:
+      # isolation: worktree  # ⚠️ 비활성화 (GitHub #29110, #27649 — worktree 데이터 유실 + silent freeze)
+      model: opus  # 2.1.72: per-invocation model override 복원
+    responsibilities:
+      - "historian/get_error_solutions로 과거 해결책 검색"
+      - "가설 A 수립 + 검증 (코드 레벨 분석)"
+      - "먼저 해결 시 investigator-2에 알림"
+      - "수정 구현 + pnpm build 검증"
+
+  - name: investigator-2
+    agent_type: "04-implementation/code-writer"
+    role: MEMBER
+    system_prompt_ref: ".claude/squads/roles/bug-investigator.md"
+    spawn_options:
+      # isolation: worktree  # ⚠️ 비활성화 (GitHub #29110, #27649 — worktree 데이터 유실 + silent freeze)
+      model: opus  # 2.1.72: per-invocation model override 복원
+    responsibilities:
+      - "가설 B 수립 + 검증 (다른 각도 분석)"
+      - "인프라/환경 레벨 원인 탐색"
+      - "먼저 해결 시 investigator-1에 알림"
+      - "수정 구현 + pnpm build 검증"
+
+  # Critical 레벨일 때만 추가 (optional)
+  - name: investigator-3
+    agent_type: "general-purpose"
+    role: MEMBER
+    optional: true
+    condition: "P0 또는 서비스 다운 시"
+    system_prompt_ref: ".claude/squads/roles/bug-coordinator.md"
+    responsibilities:
+      - "로그/모니터링 데이터 분석 (Datadog 등)"
+      - "가설 조율 (중복 탐색 방지)"
+      - "영향 범위 파악 + 롤백 판단"
+
+# 가설 병렬 검증 패턴: 먼저 성공한 쪽이 승리
+task_flow:
+  - step: 1
+    actor: investigator-1
+    action: "historian 검색 → 에러 재현 → 가설 A 수립"
+  - step: 2
+    actor: investigator-2
+    action: "(병렬) 다른 각도에서 가설 B 수립 → 검증 시작"
+  - step: 3
+    actor: investigator-3
+    action: "(Critical 시 병렬) 로그/모니터링 분석 → 영향 범위 파악"
+  - step: 4
+    actor: investigator-1
+    action: |
+      가설 검증 완료 시:
+        - 성공 → TaskUpdate(status: completed) + 나머지 investigator에 알림
+        - 실패 → 가설 재수립 또는 investigator-2 결과 대기
+  - step: 5
+    actor: investigator-2
+    action: |
+      가설 검증 완료 시:
+        - 성공 → TaskUpdate(status: completed) + 나머지 investigator에 알림
+        - 실패 → pal/thinkdeep로 근본 원인 심층 분석
+  - step: 6
+    actor: investigator-1
+    action: "수정 구현 → pnpm build → 회귀 테스트"
+
+completion_condition:
+  - "버그 원인 규명 (Root Cause 문서화)"
+  - "수정 구현 + pnpm build 성공"
+  - "재현 시나리오에서 버그 미발생 확인"
+  - "serena/write_memory로 해결책 기록 (재발 방지)"
+
+cost_multiplier: 2.5x

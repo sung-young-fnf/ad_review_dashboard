@@ -1,0 +1,75 @@
+# MCP Orchestrator
+
+> Always Answer Korean. Think carefully. Minimal code changes.
+
+## Mission
+K8s 기반 MCP 마켓플레이스 + 구독 서비스 (F&F 엔터프라이즈 AI 인프라 표준)
+
+## Tech Stack (앱별 상이 — @.claude/guides/SERVICE_DETECTION_GUIDE.md 필수 참조)
+
+| 앱 | Backend | ORM / Migration | DB Schema | 체크리스트 |
+|----|---------|----------------|-----------|-----------|
+| **mcp-orbit** | Python 3.11+ FastAPI | SQLAlchemy + Alembic | `mcp_orch.*` | `DATA_FIELD_CHECKLIST_MCP_ORBIT.md` |
+| **ai-agent** | TypeScript NestJS | Prisma + Prisma Migrate | `ai_agent.*` | `DATA_FIELD_CHECKLIST_AI_AGENT.md` |
+| **app-hub** | TypeScript NestJS | Prisma + Prisma Migrate | `app_hub.*` | `DATA_FIELD_CHECKLIST_AI_AGENT.md` 참조 |
+| **agent-office-phaser** | TypeScript Colyseus | DB 없음 | - | - |
+
+[stack: component, tech]
+Frontend 공통, Next.js 15.3+ React 19 TypeScript (agent-office-phaser는 Vite+Phaser)
+Infra, K8s 1.24+ PostgreSQL 15+ Docker
+Package, uv (Python Backend) pnpm (TypeScript Backend/Frontend)
+
+> ⚠️ `apps/{app}/CLAUDE.md`에 앱별 상세 규칙이 있으며, 해당 앱 작업 시 자동 로드됨
+
+## Commands
+```bash
+pnpm build | pnpm dev | pnpm lint | pnpm test
+```
+
+## Core Rules
+> **Goal**: "보안이 보장되고, 확장 가능하며, 운영 안정적인 엔터프라이즈 AI 인프라"
+
+[rules: status, rule, why]
+✅, MCP Transport는 Streamable HTTP 우선 (SSE 레거시만), _양방향 통신 + 재연결이 안정적인 상태_
+✅, K8s 네임스페이스 격리 (프로젝트별), _테넌트 간 자원이 충돌하지 않는 상태_
+✅, 구독 활성화 = K8s 배포 (<3분), _사용자가 구독 후 즉시 사용 가능한 상태_
+✅, mcp_orch 스키마 (public 금지), _DB 객체가 격리되어 충돌하지 않는 상태_
+✅, MCP_ENCRYPTION_KEY 암호화 필수, _민감정보가 평문으로 노출되지 않는 상태_
+✅, BFF 필수: Browser→Next.js API Route→Backend, _인증 토큰이 서버사이드에서만 처리되는 상태_
+❌, 브라우저에서 Backend 직접 호출 금지, _CORS/인증 우회가 불가능한 상태_
+❌, MCP Transport SSE 신규 금지 (일반 HTTP SSE 스트리밍은 허용), _MCP 신규 연결은 모두 Streamable HTTP인 상태_
+❌, 하위 버전 호환성 미보장, _레거시 부채 없이 최신 API만 유지하는 상태_
+
+## Workflow (--hard-think --delegate 자동 적용)
+
+### Solo 모드 (기본값)
+[route: keyword, agent]
+bug/error, error-fixer
+db/schema, db-code-writer
+epic/대형, epic-creator (+ Pre-Flight Scanner 자동 실행)
+story/중형, story-creator
+task/소형, task-planner
+분석/점검, file-analyzer
+**배포확인/푸시**, deployment-watcher (백그라운드 CI/CD 모니터링)
+**UX/UI 점검**, ux-master-auditor (4-Tier 병렬 분석)
+
+### Squad 모드 (대형 작업)
+Hook이 SQUAD_SCALE을 판단하여, SOLO가 아니면 자동 편성:
+
+[route: scale, squad, members]
+EPIC, epic-squad, architect + dev×2 + reviewer (4명)
+PLANNING, planning-squad, planner + code-scanner + ux-advisor (2-3명)
+ANALYSIS, analysis-squad, coordinator + structure/quality/tech analyzer (3-4명)
+DESIGN, design-squad, architect + task-validator + flow-analyzer (2-3명)
+QUALITY, quality-squad, quality-lead + impl/perf/security checker (3-4명)
+STORY, story-squad, tech-lead + dev (2-3명)
+BUG_CRITICAL, bug-squad, investigator×2-3
+DB, db-squad, db-architect + db-dev (2명)
+UX, ux-squad, ux-analyst + ui-dev + verifier (3명)
+
+참조: @.claude/squads/README.md
+
+## References
+- 상세 컨텍스트: @.docs/context/SERVICE_CONTEXT.md
+- 범용 규칙: @.claude/CLAUDE.md
+- 가이드: @.claude/guides/

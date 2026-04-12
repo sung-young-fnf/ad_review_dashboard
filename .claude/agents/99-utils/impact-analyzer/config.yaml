@@ -1,0 +1,121 @@
+# Impact Analyzer Configuration
+# Version: 1.0
+
+# ===================================================================
+# Layer 1: 통계 계산 임계값
+# ===================================================================
+thresholds:
+  # Component Usage Risk Levels
+  component_usage_high: 5      # 5회 이상: HIGH risk
+  component_usage_medium: 3    # 3회 이상: MEDIUM risk
+  # LOW risk: < 3회 (기본값)
+
+  # API Chain Depth
+  api_chain_depth_warning: 3   # 3개 이상 호출: 복잡도 경고
+  api_chain_depth_critical: 5  # 5개 이상 호출: 매우 복잡 (E2E 테스트 필수)
+
+  # DB Relationship Depth
+  db_relationship_depth_warning: 3  # 3단계 이상 관계: 복잡도 경고
+
+# ===================================================================
+# Layer 2: 인사이트 추출 임계값
+# ===================================================================
+insights:
+  # Technical Debt Scoring
+  debt_score_critical: 15      # 15점 이상: critical 알림 (즉시 조치 필요)
+  debt_score_warning: 8        # 8점 이상: warning 알림 (모니터링 필요)
+  # ok: < 8점 (알림 불필요)
+
+  # Debt Score Calculation Weights
+  debt_weight_usage_count: 2   # 사용 횟수 가중치
+  debt_weight_risk_high: 3     # HIGH risk 가중치
+  debt_weight_risk_medium: 2   # MEDIUM risk 가중치
+  debt_weight_risk_low: 1      # LOW risk 가중치
+
+  # Hotspot Detection
+  hotspot_usage_count: 10      # 10회 이상: 매우 위험한 핫스팟
+
+  # API Chain Complexity
+  deep_chain_depth: 4          # 4개 이상 호출: 매우 복잡한 API 체인
+
+  # Efficiency Pattern Extraction
+  reusable_component_threshold: 5  # 5회 이상 사용: 재사용 가능한 컴포넌트
+  complex_api_chain_threshold: 3   # 3개 이상 호출: 복잡한 API 체인
+
+# ===================================================================
+# Output Configuration
+# ===================================================================
+output:
+  format: "markdown"
+  file_path: "docs/analysis/impact-analysis-report.md"
+  github_flavored: true
+  use_emojis: true
+
+  # Report Sections (활성화 여부)
+  sections:
+    overall_metrics: true
+    component_usage: true
+    api_call_chains: true
+    db_relationships: true
+    technical_debt_alerts: true
+    efficiency_patterns: true
+    risk_signals: true
+    recommendations: true
+
+  # Table Formatting
+  table_max_width: 80         # 테이블 최대 너비 (글자 수)
+  truncate_long_text: true    # 긴 텍스트 자동 축약
+
+# ===================================================================
+# Filtering Options (선택적 필터)
+# ===================================================================
+filters:
+  # Epic/Story 필터
+  epic_id: null               # 예: "EP004" (null이면 전체 분석)
+  story_id: null              # 예: "S02" (null이면 전체 분석)
+
+  # Agent 필터
+  agent_name: null            # 예: "code-writer" (null이면 전체 분석)
+
+  # Screen 필터
+  screen_name: null           # 예: "okr-list-page" (null이면 전체 분석)
+
+# ===================================================================
+# Blast Radius (Mantic Brain Scorer 착안, serena 기반)
+# ===================================================================
+blast_radius:
+  # Score = (direct × direct_weight) + (indirect × indirect_weight) + (tests × test_weight)
+  direct_weight: 10
+  indirect_weight: 3
+  test_weight: 2
+
+  # Classification thresholds
+  small_max: 20        # Score < 20: 바로 진행
+  medium_max: 50       # Score < 50: 관련 테스트 확인 권장
+  large_max: 80        # Score < 80: Pre-Flight 강제
+  # critical: >= 80    # 사용자 명시적 승인 필수
+
+  # 2-hop 분석 설정
+  max_direct_for_2hop: 5    # 2-hop 분석 시 상위 N개 direct만 추적
+  max_symbols_per_file: 10  # 파일당 최대 분석 심볼 수
+
+# ===================================================================
+# Phase 2: 고급 기능 (미래 확장)
+# ===================================================================
+advanced:
+  # Generation Log 기반 시계열 분석
+  enable_time_series_analysis: false
+  time_series_window_days: 30   # 30일간 데이터 분석
+
+  # ML 기반 패턴 예측
+  enable_ml_pattern_prediction: false
+  ml_model_path: null
+
+  # Slack 알림 자동 발송
+  enable_slack_notifications: false
+  slack_webhook_url: null
+  slack_channel: "#okr-impact-alerts"
+
+  # 대시보드 시각화
+  enable_dashboard: false
+  dashboard_port: 3000

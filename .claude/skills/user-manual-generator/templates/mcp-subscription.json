@@ -1,0 +1,104 @@
+{
+  "title": "MCP 서버 구독하기",
+  "description": "마켓플레이스에서 MCP 서버를 구독하는 방법을 안내합니다.",
+  "baseUrl": "http://localhost:3000",
+  "browserSettings": {
+    "width": 1280,
+    "height": 800
+  },
+  "steps": [
+    {
+      "action": "navigate",
+      "url": "/marketplace",
+      "caption": "마켓플레이스로 이동합니다",
+      "duration": 2.5
+    },
+    {
+      "action": "wait",
+      "selector": "[data-testid=server-grid]",
+      "timeout": 5000,
+      "caption": "",
+      "duration": 1
+    },
+    {
+      "action": "scroll",
+      "direction": "down",
+      "amount": 200,
+      "caption": "서버 목록을 살펴봅니다",
+      "duration": 1.5
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=server-card]:first-child",
+      "caption": "원하는 MCP 서버를 선택합니다",
+      "duration": 2,
+      "zoom": {
+        "scale": 1.3,
+        "duration": 2
+      },
+      "highlight": {
+        "type": "box",
+        "color": "blue",
+        "duration": 1.5
+      }
+    },
+    {
+      "action": "wait",
+      "selector": "[data-testid=server-detail]",
+      "timeout": 3000,
+      "caption": "서버 상세 정보를 확인합니다",
+      "duration": 2
+    },
+    {
+      "action": "scroll",
+      "direction": "down",
+      "amount": 150,
+      "caption": "",
+      "duration": 1
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=subscribe-btn], button:contains('구독')",
+      "caption": "구독 버튼을 클릭합니다",
+      "duration": 2,
+      "emphasis": true,
+      "zoom": {
+        "scale": 1.5,
+        "duration": 2
+      },
+      "highlight": {
+        "type": "box",
+        "color": "green",
+        "pulse": true,
+        "duration": 2
+      }
+    },
+    {
+      "action": "wait",
+      "selector": "[data-testid=subscription-success], .toast-success",
+      "timeout": 5000,
+      "caption": "구독이 완료되었습니다!",
+      "duration": 2.5,
+      "emphasis": true
+    }
+  ],
+  "output": {
+    "formats": ["gif", "shorts"],
+    "gif": {
+      "width": 800,
+      "fps": 12
+    },
+    "shorts": {
+      "width": 1080,
+      "height": 1920,
+      "fps": 30
+    },
+    "outputDir": "output/manuals"
+  },
+  "metadata": {
+    "author": "MCP-Orbit Team",
+    "version": "1.0",
+    "tags": ["marketplace", "subscription", "mcp-server"],
+    "language": "ko"
+  }
+}

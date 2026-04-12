@@ -1,0 +1,182 @@
+#!/bin/bash
+# .claude/hooks/pre/user-prompt-submit.sh
+# Unified Pre-Hook: 사용자 입력 전처리 + 컨텍스트 주입 + 스크린샷 프로토콜
+# Version: 2.1 (stdin 읽기 통합)
+
+set -e
+trap 'exit 0' ERR
+
+# ============================================================================
+# Phase 0: stdin 읽기 (한 번만!)
+# ============================================================================
+
+# 사용자 입력 읽기 (우선순위: stdin > 환경 변수 > 인자)
+if [ ! -t 0 ]; then
+  # stdin이 있으면 (Claude Code가 JSON 전달)
+  INPUT_JSON=$(cat 2>/dev/null || echo "")
+
+  # DEBUG: JSON 구조 확인 (임시)
+  echo "[DEBUG] INPUT_JSON preview (first 500 chars):" >&2
+  echo "$INPUT_JSON" | head -c 500 >&2
+  echo "" >&2
+  echo "[DEBUG] JSON keys:" >&2
+  echo "$INPUT_JSON" | jq -r 'keys // empty' 2>&1 | head -5 >&2
+
+  # JSON 형태인지 확인 (jq 사용 가능하면)
+  if command -v jq &> /dev/null && echo "$INPUT_JSON" | jq -e . &>/dev/null; then
+    # JSON에서 user_prompt 추출
+    USER_INPUT=$(echo "$INPUT_JSON" | jq -r '.user_prompt // .prompt // empty' 2>/dev/null || echo "$INPUT_JSON")
+  else
+    # JSON 아니면 그대로 사용
+    USER_INPUT="$INPUT_JSON"
+  fi
+
+  # 환경 변수로 export (하위 스크립트에서 사용)
+  export CLAUDE_USER_PROMPT="$USER_INPUT"
+  export CLAUDE_INPUT_JSON="$INPUT_JSON"  # JSON 전체도 export
+else
+  # stdin 없으면 환경 변수 또는 인자 사용
+  USER_INPUT="${CLAUDE_USER_PROMPT:-${1:-}}"
+fi
+
+# 빈 입력이면 조용히 종료
+if [[ -z "$USER_INPUT" ]]; then
+  echo "[DEBUG] user-prompt-submit: 빈 입력 (stdin: $([ -t 0 ] && echo 'no' || echo 'yes'))" >&2
+  exit 0
+fi
+
+# ============================================================================
+# Phase 1: Main Context Injection (기존 로직)
+# ============================================================================
+
+# 메인 Hook 실행 (환경 변수로 전달)
+MAIN_HOOK="$(dirname "${BASH_SOURCE[0]}")/user-prompt-submit-main.sh"
+
+if [[ -f "$MAIN_HOOK" ]]; then
+  # 환경 변수로 전달 (stdin은 이미 읽었으므로)
+  CLAUDE_USER_PROMPT="$USER_INPUT" "$MAIN_HOOK"
+else
+  echo "⚠️ Warning: Main hook not found at $MAIN_HOOK" >&2
+fi
+
+# ============================================================================
+# Phase 2: Screenshot Context Injection (신규 로직)
+# ============================================================================
+
+# 스크린샷 감지 (2가지 방법: 키워드 OR base64)
+HAS_SCREENSHOT=false
+
+# 방법 1: 키워드 감지
+SCREENSHOT_KEYWORDS="스크린샷|screenshot|화면|페이지|UI|버튼|레이아웃|깨짐|안보임|안 보임|겹침|겹쳐|표시"
+if [[ -n "$USER_INPUT" ]] && echo "$USER_INPUT" | grep -iEq "$SCREENSHOT_KEYWORDS"; then
+  HAS_SCREENSHOT=true
+  echo "[DEBUG] Screenshot detected: keyword match" >&2
+fi
+
+# 방법 2: base64 이미지 데이터 감지 (더 정확)
+if [[ -n "${CLAUDE_INPUT_JSON:-}" ]]; then
+  # JSON에서 이미지 필드 확인 (다양한 패턴)
+  if echo "$CLAUDE_INPUT_JSON" | jq -e '
+    (.attachments[]? | select(.type == "image")) //
+    (.images[]?) //
+    (.content[]? | select(.type == "image")) //
+    (. | tostring | test("data:image/(png|jpeg|jpg|gif|webp);base64,"))
+  ' &>/dev/null; then
+    HAS_SCREENSHOT=true
+    echo "[DEBUG] Screenshot detected: base64 image data found" >&2
+  fi
+
+  # 간단한 패턴 감지 (fallback)
+  if echo "$CLAUDE_INPUT_JSON" | grep -qE 'data:image/(png|jpeg|jpg|gif|webp);base64,'; then
+    HAS_SCREENSHOT=true
+    echo "[DEBUG] Screenshot detected: base64 pattern match" >&2
+  fi
+fi
+
+if [[ "$HAS_SCREENSHOT" == "true" ]]; then
+  echo "" >&2
+  echo "[screenshot-context] Screenshot protocol activated" >&2
+
+  cat <<'EOF'
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║         📸 SCREENSHOT ANALYSIS PROTOCOL (자동 활성화 - v2.1)               ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+⚡ **Screenshot-First 접근** (효율성 우선):
+
+Phase 1: Screenshot Analysis (먼저 시도)
+  스크린샷에서 직접 읽기:
+    - URL 바 확인 (/admin/teams, /spark-note)
+    - 페이지 제목/헤더 확인
+    - UI 요소 위치 파악
+
+  결과:
+    ✅ 명확 (URL 보임, 컴포넌트 특정 가능) → Phase 2로 진행
+    ❌ 불명확 (URL 안 보임, 복잡한 UI) → Phase 1.5 실행
+
+Phase 1.5: Chrome DevTools (조건부 - 불명확 시에만)
+  조건:
+    - URL/Title이 스크린샷에 안 보임
+    - Active Element 특정 필요 (복잡한 인터랙션)
+    - 동적 상태 확인 필요
+
+  Tools (필요 시에만):
+    - mcp__chrome-devtools__list_pages
+    - mcp__chrome-devtools__take_snapshot
+
+  ⚠️ 제약:
+    - 브라우저 닫힘 → chrome-error → 스크린샷 분석으로 폴백
+
+Phase 2: Context Merge
+  URL → 파일 경로:
+    /admin/teams → app/(authenticated)/admin/teams/page.tsx
+    /spark-note → app/(authenticated)/spark-note/page.tsx
+
+  Title → 컴포넌트:
+    "Team Dashboard" → TeamDashboard
+    "Spark Note" → SparkNoteView
+
+Phase 3: Accurate Location
+  📍 출력: 파일:라인:컴포넌트:문제
+
+───────────────────────────────────────────────────────────────────────────
+
+✅ 효율적 패턴 (80% 케이스):
+  1. 스크린샷에서 URL 확인 → 파일 경로 매핑 → 즉시 수정
+  2. Chrome DevTools Skip → 2-3초 절감
+
+✅ 정확도 우선 (20% 케이스):
+  1. 스크린샷 불명확 → Chrome DevTools 호출
+  2. Active Element 확보 → 정확한 위치 특정
+
+❌ 금지:
+  - 추측 ("~인 것 같습니다")
+  - 불명확한 답변 ("Dashboard 컴포넌트일 것 같아요")
+
+───────────────────────────────────────────────────────────────────────────
+📋 참조: @docs/analysis/screenshot-analysis-workflow.md
+
+EOF
+fi
+
+# ============================================================================
+# Phase 2.5: Git Context Injection (리팩토링 히스토리)
+# ============================================================================
+
+# Git Context Hook 실행 (리팩토링 관련 키워드 감지 시)
+GIT_CONTEXT_HOOK="$(dirname "${BASH_SOURCE[0]}")/user-prompt-submit-git-context.sh"
+
+if [[ -f "$GIT_CONTEXT_HOOK" ]] && [[ -n "$USER_INPUT" ]]; then
+  # Git Context Hook 호출 (환경 변수로 전달)
+  GIT_CONTEXT_OUTPUT=$(echo "$USER_INPUT" | "$GIT_CONTEXT_HOOK" 2>/dev/null || echo "")
+
+  if [[ -n "$GIT_CONTEXT_OUTPUT" ]]; then
+    # Git Context가 있으면 출력
+    echo "" >&2
+    echo "[git-context] Git refactoring history injected" >&2
+    echo "$GIT_CONTEXT_OUTPUT"
+  fi
+fi
+
+exit 0

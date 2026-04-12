@@ -1,0 +1,109 @@
+# Cowork Squad - Claude × Codex 라운드제 토론
+# 사용: /debate <토픽>
+# WHY: 두 AI의 독립 관점을 교차 검증하여 편향 없는 결론을 도출
+
+name: cowork-squad
+scale: TOPIC
+description: "Claude(Anthropic)와 Codex(OpenAI)가 동등한 피어로 라운드제 토론을 진행하여 합의/미합의를 도출"
+team_size: 3
+estimated_time: "10분-30분"
+trigger_keywords: [토론, debate, 비교, 검증, cowork, 의견]
+
+roles:
+  - name: moderator
+    agent_type: "general-purpose"
+    role: LEAD
+    system_prompt_ref: ".claude/squads/roles/moderator.md"
+    responsibilities:
+      - "토론 주제 프레이밍 및 라운드 관리"
+      - "양측 분석 결과 수집 및 교차 전달"
+      - "합의점/미합의점 정리 및 최종 보고서 작성"
+      - "라운드 수 조절 (기본 3, 최대 5)"
+
+  - name: claude-analyst
+    agent_type: "general-purpose"
+    role: MEMBER
+    system_prompt_ref: ".claude/squads/roles/debater-claude.md"
+    responsibilities:
+      - "Claude 관점으로 독립 분석 수행"
+      - "Codex 의견에 대한 동의/반박 근거 제시"
+      - "자기 주장의 약점도 인정"
+
+  - name: codex-analyst
+    agent_type: "general-purpose"
+    role: MEMBER
+    system_prompt_ref: ".claude/squads/roles/debater-codex.md"
+    responsibilities:
+      - "Codex CLI를 통해 OpenAI 관점으로 독립 분석 수행"
+      - "Claude 의견에 대한 동의/반박 근거 제시"
+      - "웹 검색 등 Codex 고유 기능 활용"
+
+task_flow:
+  - step: 1
+    name: "Round 1 — 독립 분석"
+    parallel: true
+    actors:
+      - actor: claude-analyst
+        action: "토픽에 대해 독립적으로 분석. 주장 + 근거 + 약점 자인. /tmp/debate-{id}/round1-claude.md에 저장"
+      - actor: codex-analyst
+        action: "codex exec로 동일 토픽 분석. /tmp/debate-{id}/round1-codex.md에 저장"
+
+  - step: 2
+    name: "Round 2 — 교차 반론"
+    parallel: true
+    actors:
+      - actor: claude-analyst
+        action: "round1-codex.md 읽고 동의/반박. /tmp/debate-{id}/round2-claude.md에 저장"
+      - actor: codex-analyst
+        action: "round1-claude.md를 codex exec에 전달, 동의/반박. /tmp/debate-{id}/round2-codex.md에 저장"
+
+  - step: 3
+    name: "Round 3 — 재반론 (필요 시)"
+    condition: "Round 2에서 한쪽이라도 강하게 반박한 항목이 있을 때"
+    parallel: true
+    actors:
+      - actor: claude-analyst
+        action: "round2-codex.md의 반박에 재반론 또는 수용. /tmp/debate-{id}/round3-claude.md에 저장"
+      - actor: codex-analyst
+        action: "round2-claude.md의 반박에 재반론 또는 수용. /tmp/debate-{id}/round3-codex.md에 저장"
+
+  - step: 4
+    name: "최종 — 합의 도출"
+    actor: moderator
+    action: "전체 라운드 결과를 종합하여 합의점/미합의점/권고안 정리. 미합의는 억지로 합치지 않고 양쪽 입장을 병기"
+
+  - step: "4+ (선택)"
+    name: "추가 라운드"
+    condition: "미합의 항목이 아직 쟁점이고 --rounds > 4일 때. 최대 5라운드"
+    parallel: true
+    actors:
+      - actor: claude-analyst
+        action: "미합의 항목에 한정하여 추가 반론/수용"
+      - actor: codex-analyst
+        action: "미합의 항목에 한정하여 추가 반론/수용"
+
+output:
+  format: |
+    # 토론 결과: {토픽}
+
+    ## 합의 사항
+    - [양측 동의한 결론들]
+
+    ## 미합의 사항
+    | 항목 | Claude 입장 | Codex 입장 | 판단 근거 차이 |
+    |------|-------------|------------|----------------|
+
+    ## 권고안
+    - [moderator의 종합 권고]
+
+    ## 라운드 요약
+    ### Round 1: 독립 분석
+    ### Round 2: 교차 반론
+    ### Round 3+: (있을 경우)
+
+completion_condition:
+  - "최소 2라운드(독립 분석 + 교차 반론) 완료"
+  - "합의점/미합의점이 구분되어 정리됨"
+  - "moderator가 최종 권고안 제시"
+
+cost_multiplier: 2x  # Codex API 비용 추가

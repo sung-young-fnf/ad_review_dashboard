@@ -1,0 +1,99 @@
+# Story Squad - 중규모 기능 구현을 위한 2-3인 편대
+# 사용: 새 API 추가, 컴포넌트 통합, 기능 단위 작업
+name: story-squad
+scale: STORY
+description: "Story 단위 기능 구현을 위한 2-3인 편대 (UX Story 시 reviewer 추가)"
+team_size: 2-3
+estimated_time: "2-8시간"
+trigger_keywords: [story, 기능, API, 컴포넌트, 추가, 통합]
+
+roles:
+  - name: tech-lead
+    agent_type: "general-purpose"
+    role: LEAD
+    system_prompt_ref: ".claude/squads/roles/tech-lead.md"
+    responsibilities:
+      - "Story 분석 → Task 분해 (TaskCreate)"
+      - "API Contract 검증 (Backend DTO <-> Frontend 타입)"
+      - "기술 제약 정의 및 구현 방향 설정"
+      - "dev 구현 결과 검증 + pnpm build 확인"
+
+  - name: dev
+    agent_type: "04-implementation/code-writer"
+    role: MEMBER
+    system_prompt_ref: ".claude/squads/roles/dev.md"
+    spawn_options:
+      # isolation: worktree  # ⚠️ 비활성화 (GitHub #29110, #27649 — worktree 데이터 유실 + silent freeze)
+      model: opus  # 2.1.72: per-invocation model override 복원
+    responsibilities:
+      - "Task AC 기반 구현"
+      - "Assumption Manifesto 작성 + 검증"
+      - "pnpm build 성공 보장"
+      - "완료 시 TaskUpdate(status: completed) 호출"
+
+  # UX 관련 Story일 때만 추가 (optional)
+  - name: reviewer
+    agent_type: "general-purpose"
+    role: MEMBER
+    optional: true
+    condition: "Story에 UI/UX 키워드 포함 시"
+    system_prompt_ref: ".claude/squads/roles/ux-reviewer.md"
+    responsibilities:
+      - "Nielsen Heuristics 기반 UX 검증"
+      - "WCAG 2.2 AA 접근성 확인"
+      - "Before/After 비교 검증"
+
+task_flow:
+  - step: 1
+    actor: tech-lead
+    action: "Story 분석 → Task 분해 → TaskCreate (의존성 포함)"
+  - step: 2
+    actor: tech-lead
+    action: "API Contract 검증 (Backend DTO 확인 → Frontend 타입 매핑)"
+  - step: 3
+    actor: dev
+    action: "Assumption Manifesto → Task 순차 구현 → pnpm build"
+  - step: 4
+    actor: reviewer
+    action: "(UX Story일 때만) UI 검증 → 피드백 → dev 수정"
+  - step: 5
+    actor: tech-lead
+    action: "전체 검증 → completion_condition 체크"
+
+# agtx 패턴: Per-Phase Model Config
+phase_overrides:
+  analysis:
+    model: gemini
+    rationale: "관련 모듈 전수 분석"
+  planning:
+    model: claude-opus
+    rationale: "Task 분해 및 기술 제약 정의"
+  implementation:
+    model: claude-opus
+    rationale: "코드 구현 (파일 편집 필수)"
+  review:
+    model: codex
+    rationale: "코드 추론 기반 리뷰"
+
+# agtx 패턴: Artifact-Based Phase Completion
+artifacts:
+  analysis:
+    path: "docs/epics/{epic_id}/{story_id}/tech-spec.md"
+    skip_if_exists: true
+  planning:
+    path: "docs/epics/{epic_id}/{story_id}/tasks/*.md"
+    skip_if_exists: true
+  implementation:
+    signal: "pnpm build && pnpm tsc --noEmit"
+    skip_if_exists: false
+  review:
+    signal: "tech-lead approval via TaskUpdate"
+    skip_if_exists: false
+
+completion_condition:
+  - "모든 Task가 completed 상태"
+  - "pnpm build 성공 (TypeScript 에러 0개)"
+  - "Story AC 전체 달성"
+  - "(UX Story) reviewer 승인 완료"
+
+cost_multiplier: 2.5x

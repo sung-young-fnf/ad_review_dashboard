@@ -1,0 +1,395 @@
+#!/usr/bin/env node
+import { readFileSync } from 'fs';
+
+// Hook Input Interface (Claude Code standard)
+interface HookInput {
+    session_id: string;
+    transcript_path: string;
+    cwd: string;
+    permission_mode: string;
+    prompt: string;
+}
+
+// Enhanced 4-Step Analysis Interfaces
+interface UserIntent {
+    keywords: string[];
+    intent_type: 'create' | 'modify' | 'debug' | 'analyze' | 'delete';
+    complexity: 'epic' | 'story' | 'task' | 'hotfix' | 'db';
+    domain: 'auth' | 'ui' | 'api' | 'db' | 'test' | 'deployment';
+    tech_indicators: string[];
+}
+
+interface ProjectContext {
+    auth_system: {
+        tech_stack: string;
+        db_schema: string;
+        security: string;
+    };
+    api_development: {
+        pattern: string;
+        auth_header: string;
+        impersonation: string;
+    };
+    ui_components: {
+        framework: string;
+        state_management: string;
+        hooks: string;
+    };
+    database: {
+        schema: string;
+        prohibition: string;
+        alternative: string;
+    };
+}
+
+interface AgentRecommendation {
+    agent: string;
+    confidence: number;
+    reasoning: string;
+    specialties: string[];
+    confidence_domains: string[];
+}
+
+// okr2 Project Patterns
+const OKR2_PROJECT_PATTERNS: ProjectContext = {
+    auth_system: {
+        tech_stack: "NextAuth.js + JWT + Bearer Token",
+        db_schema: "sparknote",
+        security: "OWASP Authentication Guidelines"
+    },
+    api_development: {
+        pattern: "Next.js App Router + Proxy Pattern",
+        auth_header: "session.backendToken",
+        impersonation: "X-Impersonate-User header"
+    },
+    ui_components: {
+        framework: "React 18 + TypeScript + Tailwind",
+        state_management: "useState + useEffect (primitive deps only)",
+        hooks: "Custom hooks with useMemo stabilization"
+    },
+    database: {
+        schema: "sparknote",
+        prohibition: "NO PostgreSQL ENUM types",
+        alternative: "VARCHAR + TypeScript literal types"
+    }
+};
+
+// Agent Expertise Map
+const AGENT_EXPERTISE_MAP = {
+    'epic-creator': {
+        specialties: ["MVP design", "user stories", "auth systems"],
+        confidence_domains: ["auth", "business_logic", "system_design"]
+    },
+    'story-creator': {
+        specialties: ["API design", "UI components", "data flow"],
+        confidence_domains: ["api", "ui", "crud", "integration"]
+    },
+    'code-writer': {
+        specialties: ["React implementation", "API routes", "DB schema"],
+        confidence_domains: ["react", "nextjs", "typescript", "prisma"]
+    },
+    'error-fixer': {
+        specialties: ["debugging", "runtime errors", "performance"],
+        confidence_domains: ["error_handling", "optimization", "troubleshooting"]
+    }
+};
+
+function analyzeUserIntent(userInput: string): UserIntent {
+    const input = userInput.toLowerCase();
+
+    // Extract keywords
+    const keywords = input.split(/\s+/).filter(word => word.length > 2);
+
+    // Classify intent
+    let intent_type: UserIntent['intent_type'] = 'modify';
+    if (input.includes('새로운') || input.includes('추가') || input.includes('생성')) {
+        intent_type = 'create';
+    } else if (input.includes('수정') || input.includes('변경') || input.includes('개선')) {
+        intent_type = 'modify';
+    } else if (input.includes('디버그') || input.includes('에러') || input.includes('버그')) {
+        intent_type = 'debug';
+    } else if (input.includes('분석') || input.includes('확인') || input.includes('검토')) {
+        intent_type = 'analyze';
+    } else if (input.includes('삭제') || input.includes('제거')) {
+        intent_type = 'delete';
+    }
+
+    // Assess complexity
+    let complexity: UserIntent['complexity'] = 'story';
+    if (input.includes('시스템') || input.includes('플랫폼') || input.includes('아키텍처')) {
+        complexity = 'epic';
+    } else if (input.includes('긴급') || input.includes('핫픽스') || input.includes('다운')) {
+        complexity = 'hotfix';
+    } else if (input.includes('스키마') || input.includes('마이그레이션') || input.includes('db')) {
+        complexity = 'db';
+    } else if (input.includes('버그') || input.includes('수정') && input.length < 50) {
+        complexity = 'task';
+    }
+
+    // Identify domain
+    let domain: UserIntent['domain'] = 'api';
+    if (input.includes('인증') || input.includes('로그인') || input.includes('사용자')) {
+        domain = 'auth';
+    } else if (input.includes('화면') || input.includes('컴포넌트') || input.includes('ui')) {
+        domain = 'ui';
+    } else if (input.includes('db') || input.includes('데이터베이스') || input.includes('스키마')) {
+        domain = 'db';
+    } else if (input.includes('테스트') || input.includes('검증')) {
+        domain = 'test';
+    } else if (input.includes('배포') || input.includes('빌드')) {
+        domain = 'deployment';
+    }
+
+    // Extract tech indicators
+    const tech_indicators: string[] = [];
+    if (input.includes('react')) tech_indicators.push('react');
+    if (input.includes('typescript') || input.includes('ts')) tech_indicators.push('typescript');
+    if (input.includes('nextjs') || input.includes('next')) tech_indicators.push('nextjs');
+    if (input.includes('api')) tech_indicators.push('api');
+    if (input.includes('prisma')) tech_indicators.push('prisma');
+
+    return {
+        keywords,
+        intent_type,
+        complexity,
+        domain,
+        tech_indicators
+    };
+}
+
+function selectOptimalAgent(intent: UserIntent): AgentRecommendation {
+    // Agent selection logic based on complexity and domain
+    let selectedAgent = 'story-creator';
+    let confidence = 85;
+    let reasoning = '';
+
+    if (intent.complexity === 'epic') {
+        selectedAgent = 'epic-creator';
+        confidence = 95;
+        reasoning = 'Complex system design requires comprehensive Epic planning';
+    } else if (intent.complexity === 'hotfix') {
+        selectedAgent = 'error-fixer';
+        confidence = 98;
+        reasoning = 'Emergency situation requires immediate error fixing';
+    } else if (intent.complexity === 'db') {
+        selectedAgent = 'db-code-writer';
+        confidence = 92;
+        reasoning = 'Database operations require specialized DB agent';
+    } else if (intent.intent_type === 'debug') {
+        selectedAgent = 'error-fixer';
+        confidence = 88;
+        reasoning = 'Debugging requires error analysis and fixing expertise';
+    } else if (intent.domain === 'auth') {
+        selectedAgent = 'epic-creator';
+        confidence = 93;
+        reasoning = 'Authentication system requires comprehensive MVP design';
+    } else if (intent.domain === 'ui' && intent.intent_type === 'create') {
+        selectedAgent = 'story-creator';
+        confidence = 90;
+        reasoning = 'UI component creation fits Story-level implementation';
+    } else if (intent.complexity === 'task') {
+        selectedAgent = 'task-planner';
+        confidence = 87;
+        reasoning = 'Simple modifications work well with Task-level planning';
+    }
+
+    const agentInfo = AGENT_EXPERTISE_MAP[selectedAgent as keyof typeof AGENT_EXPERTISE_MAP];
+
+    return {
+        agent: selectedAgent,
+        confidence,
+        reasoning,
+        specialties: agentInfo?.specialties || [],
+        confidence_domains: agentInfo?.confidence_domains || []
+    };
+}
+
+function generateContextInjection(intent: UserIntent, recommendation: AgentRecommendation): string {
+    const domainUpper = intent.domain.toUpperCase();
+    const intentUpper = intent.intent_type.toUpperCase();
+
+    let output = '';
+    output += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+    output += '🧠 CLAUDE CONTEXT INJECTION\n';
+    output += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
+
+    output += `🎯 ${domainUpper} ${intentUpper} DETECTED\n\n`;
+
+    output += `📋 Recommended Agent: ${recommendation.agent}\n`;
+    output += `   Expertise: ${recommendation.specialties.join(', ')}\n`;
+    output += `   Confidence: ${recommendation.confidence}% (${recommendation.reasoning})\n\n`;
+
+    // Domain-specific context
+    if (intent.domain === 'auth') {
+        output += '🔧 okr2 Technical Context:\n';
+        output += `   - ${OKR2_PROJECT_PATTERNS.auth_system.tech_stack}\n`;
+        output += `   - PostgreSQL ${OKR2_PROJECT_PATTERNS.database.schema} schema (${OKR2_PROJECT_PATTERNS.database.prohibition})\n`;
+        output += `   - ${OKR2_PROJECT_PATTERNS.api_development.auth_header} authentication (NOT accessToken)\n`;
+        output += `   - ${OKR2_PROJECT_PATTERNS.api_development.impersonation} for admin features\n\n`;
+
+        output += '⚠️ Critical Warnings:\n';
+        output += `   - ${OKR2_PROJECT_PATTERNS.database.prohibition}: Use ${OKR2_PROJECT_PATTERNS.database.alternative}\n`;
+        output += `   - ${OKR2_PROJECT_PATTERNS.auth_system.security} compliance required\n`;
+        output += '   - Admin impersonation pattern mandatory for all auth endpoints\n\n';
+    } else if (intent.domain === 'ui') {
+        output += '🔧 okr2 Technical Context:\n';
+        output += `   - ${OKR2_PROJECT_PATTERNS.ui_components.framework}\n`;
+        output += `   - ${OKR2_PROJECT_PATTERNS.api_development.pattern}\n`;
+        output += `   - PostgreSQL ${OKR2_PROJECT_PATTERNS.database.schema} schema with proper relations\n\n`;
+
+        output += '⚠️ Critical Warnings:\n';
+        output += '   - 405 Error Prevention: Implement ALL required HTTP methods\n';
+        output += '   - 404 Error Prevention: Nested routes need separate directories\n';
+        output += '   - React Hook Dependencies: Use primitive values only\n';
+        output += `   - DB Schema Prefix: All queries must use ${OKR2_PROJECT_PATTERNS.database.schema}.table_name\n\n`;
+    } else if (intent.domain === 'api') {
+        output += '🔧 okr2 Technical Context:\n';
+        output += `   - ${OKR2_PROJECT_PATTERNS.api_development.pattern}\n`;
+        output += '   - NestJS backend with JWT authentication\n';
+        output += '   - Proxy pattern with environment variable fallbacks\n';
+        output += '   - Admin impersonation support\n\n';
+
+        output += '⚠️ Critical Warnings:\n';
+        output += '   - Environment Variables: API_BASE_URL || BACKEND_URL || NEXT_PUBLIC_BACKEND_URL\n';
+        output += `   - Authentication: Bearer token from ${OKR2_PROJECT_PATTERNS.api_development.auth_header}\n`;
+        output += '   - Error Handling: Comprehensive try-catch with user-friendly messages\n';
+        output += '   - Method Support: All HTTP methods that frontend will call\n\n';
+    } else if (intent.domain === 'db') {
+        output += '🔧 okr2 Technical Context:\n';
+        output += `   - PostgreSQL ${OKR2_PROJECT_PATTERNS.database.schema} schema (MANDATORY prefix)\n`;
+        output += `   - ${OKR2_PROJECT_PATTERNS.database.prohibition} - ${OKR2_PROJECT_PATTERNS.database.alternative}\n`;
+        output += '   - Prisma ORM with schema validation\n';
+        output += '   - Alembic migrations for schema changes\n\n';
+
+        output += '⚠️ Critical Warnings:\n';
+        output += `   - ALL SQL queries MUST use ${OKR2_PROJECT_PATTERNS.database.schema}.table_name prefix\n`;
+        output += `   - ${OKR2_PROJECT_PATTERNS.database.prohibition} (변경 불가능성, 마이그레이션 위험)\n`;
+        output += '   - Transaction safety for all data modifications\n';
+        output += '   - Parameterized queries for SQL injection prevention\n\n';
+    }
+
+    output += '💡 Quality Checkpoints:\n';
+    if (intent.tech_indicators.includes('react')) {
+        output += '   - React Hook dependency array validation\n';
+    }
+    output += '   - API error handling completeness\n';
+    output += `   - Database schema prefix compliance (${OKR2_PROJECT_PATTERNS.database.schema}.)\n`;
+    output += '   - Authentication flow security validation\n\n';
+
+    // Workflow prediction
+    if (intent.complexity === 'epic') {
+        output += '📋 Predicted Workflow: Epic → Story → Task → Implementation\n';
+        output += '🕒 Estimated Timeline: 25-30 minutes (based on similar Epic tasks)\n';
+    } else if (intent.complexity === 'story') {
+        output += '📋 Predicted Story Structure:\n';
+        output += '   S01: Database schema + API implementation\n';
+        output += '   S02: UI display components\n';
+        output += '   S03: Create/Edit forms with validation\n';
+        output += '   S04: Real-time updates and admin features\n\n';
+        output += '🕒 Estimated Timeline: 18-22 minutes (based on CRUD velocity)\n';
+    } else if (intent.complexity === 'task') {
+        output += '📋 Predicted Task Flow:\n';
+        output += '   T01: Analysis and planning\n';
+        output += '   T02: Implementation\n';
+        output += '   T03: Testing and validation\n\n';
+        output += '🕒 Estimated Timeline: 8-12 minutes (based on task complexity)\n';
+    }
+
+    output += '\n🎯 AUTO-WORKFLOW ROUTING:\n';
+    output += '   Enhanced 4-Step: STOP → ANALYZE → INJECT → ROUTE\n\n';
+
+    output += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+
+    return output;
+}
+
+async function main() {
+    try {
+        // Read input from stdin
+        const input = readFileSync(0, 'utf-8');
+        const data: HookInput = JSON.parse(input);
+        const prompt = data.prompt;
+
+        // Execute Layer 1: Skill Activation
+        const SUGGESTION_FILE = '/tmp/claude_hook_suggestions';
+        let layer1Context = '';
+
+        try {
+            // Run skill-activation script (Layer 1)
+            const { execSync } = require('child_process');
+            const path = require('path');
+            const fs = require('fs');
+
+            // Find project root (contains .claude directory)
+            let projectRoot = __dirname;
+            while (!fs.existsSync(path.join(projectRoot, '.claude', 'skills'))) {
+                const parent = path.dirname(projectRoot);
+                if (parent === projectRoot) break; // Reached filesystem root
+                projectRoot = parent;
+            }
+
+            const scriptPath = path.join(__dirname, '01-skill-activation.sh');
+
+            console.error(`[DEBUG] Project root: ${projectRoot}`);
+            console.error(`[DEBUG] Script path: ${scriptPath}`);
+            console.error(`[DEBUG] Script exists: ${fs.existsSync(scriptPath)}`);
+
+            if (fs.existsSync(scriptPath)) {
+                try {
+                    const output = execSync(`bash "${scriptPath}"`, {
+                        input: prompt,
+                        encoding: 'utf-8',
+                        cwd: projectRoot, // Run from project root
+                    });
+                    console.error(`[DEBUG] Layer 1 output: ${output}`);
+
+                    // Read Layer 1 suggestions if available
+                    if (require('fs').existsSync(SUGGESTION_FILE)) {
+                        layer1Context = readFileSync(SUGGESTION_FILE, 'utf-8');
+                        require('fs').unlinkSync(SUGGESTION_FILE);
+
+                        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                        console.log('📋 Layer 1 Context Loaded:');
+                        console.log(layer1Context);
+                        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+                    }
+                } catch (err: any) {
+                    // If Layer 1 blocked (exit code 1), propagate the error
+                    if (err.status === 1) {
+                        process.exit(1); // Guardrail blocked - stop entire flow
+                    }
+                    // Otherwise, Layer 1 not available, continue with Layer 2 only
+                }
+            }
+        } catch (err) {
+            // Layer 1 setup failed, continue with Layer 2 only
+        }
+
+        // Skip if prompt is too short or looks like non-development request
+        if (prompt.length < 10 ||
+            !prompt.match(/추가|생성|수정|개선|삭제|구현|개발|시스템|api|ui|db|컴포넌트|기능/i)) {
+            process.exit(0);
+        }
+
+        // Step 1: ANALYZE - Intent Pattern Analysis
+        const intent = analyzeUserIntent(prompt);
+
+        // Step 2: INJECT - Select optimal agent and generate context
+        const recommendation = selectOptimalAgent(intent);
+        const contextInjection = generateContextInjection(intent, recommendation);
+
+        // Step 3: OUTPUT - Send context injection to Claude
+        console.log(contextInjection);
+        console.log(`📨 Original User Message: "${prompt}"\n`);
+
+        process.exit(0);
+    } catch (err) {
+        console.error('Error in user-prompt-submit hook:', err);
+        process.exit(1);
+    }
+}
+
+main().catch(err => {
+    console.error('Uncaught error:', err);
+    process.exit(1);
+});

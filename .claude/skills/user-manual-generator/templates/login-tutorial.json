@@ -1,0 +1,108 @@
+{
+  "title": "MCP-Orbit 로그인 방법",
+  "description": "MCP-Orbit에 로그인하는 방법을 단계별로 안내합니다.",
+  "baseUrl": "http://localhost:3000",
+  "browserSettings": {
+    "width": 1280,
+    "height": 800,
+    "device": null
+  },
+  "steps": [
+    {
+      "action": "navigate",
+      "url": "/login",
+      "caption": "로그인 페이지에 접속합니다",
+      "duration": 2.5
+    },
+    {
+      "action": "wait",
+      "duration": 1,
+      "caption": ""
+    },
+    {
+      "action": "click",
+      "selector": "input[type=email], #email, [name=email]",
+      "caption": "이메일 입력란을 클릭합니다",
+      "duration": 1.5,
+      "highlight": {
+        "type": "box",
+        "color": "red",
+        "thickness": 3,
+        "duration": 1.5
+      }
+    },
+    {
+      "action": "type",
+      "selector": "input[type=email], #email, [name=email]",
+      "text": "demo@example.com",
+      "caption": "이메일 주소를 입력합니다",
+      "duration": 2,
+      "typeSpeed": 80
+    },
+    {
+      "action": "click",
+      "selector": "input[type=password], #password, [name=password]",
+      "caption": "비밀번호 입력란을 클릭합니다",
+      "duration": 1.5,
+      "highlight": {
+        "type": "box",
+        "color": "red",
+        "duration": 1.5
+      }
+    },
+    {
+      "action": "type",
+      "selector": "input[type=password], #password, [name=password]",
+      "text": "••••••••",
+      "caption": "비밀번호를 입력합니다",
+      "duration": 1.5,
+      "masked": true
+    },
+    {
+      "action": "click",
+      "selector": "button[type=submit], .login-button, [data-testid=login-btn]",
+      "caption": "로그인 버튼을 클릭합니다",
+      "duration": 2,
+      "emphasis": true,
+      "zoom": {
+        "scale": 1.4,
+        "duration": 2,
+        "easing": "ease-out"
+      },
+      "highlight": {
+        "type": "box",
+        "color": "green",
+        "pulse": true,
+        "duration": 1.5
+      }
+    },
+    {
+      "action": "wait",
+      "selector": ".dashboard, [data-testid=dashboard]",
+      "timeout": 5000,
+      "caption": "로그인이 완료되었습니다!",
+      "duration": 2.5,
+      "emphasis": true
+    }
+  ],
+  "output": {
+    "formats": ["gif", "mp4"],
+    "gif": {
+      "width": 800,
+      "fps": 12,
+      "quality": "high"
+    },
+    "mp4": {
+      "width": 1280,
+      "fps": 30,
+      "crf": 20
+    },
+    "outputDir": "output/manuals"
+  },
+  "metadata": {
+    "author": "MCP-Orbit Team",
+    "version": "1.0",
+    "tags": ["login", "authentication", "getting-started"],
+    "language": "ko"
+  }
+}

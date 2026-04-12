@@ -1,0 +1,123 @@
+# Fullstack Parallel Squad - BE/BFF/FE 병렬 구현을 위한 4인 편대
+# 사용: Full-stack 기능 배포, BE+BFF+FE 동시 구현이 필요한 Story 단위 작업
+# WHY: story-squad는 tech-lead + dev 순차 구현 → 레이어별 전담 Agent 분리로 50% 단축
+# NOTE: worktree 미작동(v2.1.104) → BE→BFF→FE 순차 claim, 각 역할이 독립적으로 Task claim
+name: fullstack-parallel-squad
+scale: STORY
+description: "Full-stack 기능을 BE/BFF/FE 레이어별 전담 Agent가 순차 구현하는 4인 편대"
+team_size: 4
+estimated_time: "2-6시간"
+trigger_keywords: [풀스택, fullstack, "BE+FE", "전체 레이어", "BE+BFF+FE"]
+
+roles:
+  - name: architect
+    agent_type: "general-purpose"
+    role: LEAD
+    system_prompt_ref: ".claude/squads/roles/fullstack-architect.md"
+    responsibilities:
+      - "공유 인터페이스 계약 생성 (DTO/타입/API 시그니처)"
+      - "레이어별 Task 생성 + blocked_by 의존성 설정"
+      - "BE 완료 후 BFF/FE dev에게 API 시그니처 전달"
+      - "전체 통합 검증 (pnpm build + pnpm tsc --noEmit)"
+      - "타입 불일치 시 해당 dev에게 수정 요청"
+
+  - name: backend-dev
+    agent_type: "04-implementation/code-writer"
+    role: MEMBER
+    system_prompt_ref: ".claude/squads/roles/dev.md"
+    spawn_options:
+      model: opus
+    responsibilities:
+      - "Backend Service + Controller + DTO 구현"
+      - "Assumption Manifesto 작성 (API Contract 검증)"
+      - "pnpm build 성공 보장"
+      - "완료 시 TaskUpdate(status: completed) 호출"
+
+  - name: bff-dev
+    agent_type: "04-implementation/code-writer"
+    role: MEMBER
+    system_prompt_ref: ".claude/squads/roles/dev.md"
+    spawn_options:
+      model: opus
+    blocked_by: [backend-dev]  # BE API 시그니처 확정 후 시작
+    responsibilities:
+      - "Next.js API Route (BFF) 구현 — Browser→BFF→Backend 프록시"
+      - "auth() wrapper + backendToken 사용"
+      - "BE API 응답 shape과 FE 타입 간 변환"
+      - "완료 시 TaskUpdate(status: completed) 호출"
+
+  - name: frontend-dev
+    agent_type: "04-implementation/code-writer"
+    role: MEMBER
+    system_prompt_ref: ".claude/squads/roles/dev.md"
+    spawn_options:
+      model: opus
+    blocked_by: [backend-dev]  # BE 타입/DTO 확정 후 시작 (BFF와 병렬 가능하나 worktree 미작동으로 순차)
+    responsibilities:
+      - "React 컴포넌트 + Hook + 페이지 구현"
+      - "BFF Route 호출 (Backend 직접 호출 금지)"
+      - "FE 타입이 BE DTO와 100% 일치 확인"
+      - "완료 시 TaskUpdate(status: completed) 호출"
+
+# architect가 인터페이스 계약 → BE dev → BFF dev → FE dev (순차 claim, worktree 미작동 대안)
+task_flow:
+  - step: 1
+    actor: architect
+    action: "Task 분석 → 공유 인터페이스 계약서 생성 (DTO 필드, API 엔드포인트, HTTP 메서드, 응답 shape)"
+  - step: 2
+    actor: architect
+    action: "레이어별 Task 생성 (TaskCreate) + blocked_by 의존성 설정 (BFF/FE → BE)"
+  - step: 3
+    actor: backend-dev
+    action: "BE Task claim → Service + Controller + DTO 구현 → TaskUpdate(completed)"
+  - step: 4
+    actor: architect
+    action: "BE 완료 확인 → BFF/FE dev에게 확정된 API 시그니처 DM"
+  - step: 5
+    actor: bff-dev
+    action: "BFF Task claim → Next.js API Route 구현 → TaskUpdate(completed)"
+  - step: 6
+    actor: frontend-dev
+    action: "FE Task claim → 컴포넌트 + Hook 구현 → TaskUpdate(completed)"
+  - step: 7
+    actor: architect
+    action: "전체 통합 검증 → pnpm build + pnpm tsc --noEmit"
+  - step: 8
+    actor: architect
+    action: "타입 불일치 시 해당 dev에게 SendMessage로 수정 요청 → 재검증"
+
+# agtx 패턴: Per-Phase Model Config
+phase_overrides:
+  analysis:
+    model: gemini
+    rationale: "기존 코드 구조 분석 + 인터페이스 후보 도출"
+  planning:
+    model: claude-opus
+    rationale: "인터페이스 계약 설계 + Task 분해"
+  implementation:
+    model: claude-opus
+    rationale: "코드베이스 직접 접근 필수 (BE/BFF/FE 각각)"
+  review:
+    model: codex
+    rationale: "타입 일치성 + API Contract 교차 검증"
+
+# agtx 패턴: Artifact-Based Phase Completion
+artifacts:
+  planning:
+    path: "docs/epics/{epic_id}/interface-contract.md"
+    skip_if_exists: true
+  implementation:
+    signal: "pnpm build && pnpm tsc --noEmit"
+    skip_if_exists: false
+  review:
+    signal: "architect approval via TaskUpdate"
+    skip_if_exists: false
+
+completion_condition:
+  - "모든 레이어 Task가 completed 상태 (BE + BFF + FE)"
+  - "pnpm build 성공 (TypeScript 에러 0개)"
+  - "API Contract 일치 (BE DTO <-> BFF Route <-> FE 타입)"
+  - "Browser→Backend 직접 호출 없음 (BFF 경유 확인)"
+  - "Story AC 전체 달성"
+
+cost_multiplier: 3x

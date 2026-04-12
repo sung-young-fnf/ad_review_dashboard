@@ -9,7 +9,7 @@ K8s 기반 내부 개발 도구 모노레포
 
 | Layer | Tech |
 |-------|------|
-| Frontend (공통) | Next.js 15+ React 19 TypeScript |
+| Frontend (공통) | Next.js 16+ React 19 TypeScript |
 | Backend (선택) | FastAPI (Python) 또는 NestJS (TypeScript) |
 | Infra | K8s, Helm, ArgoCD, GitHub Actions |
 | Package | uv (Python) / pnpm (TypeScript) |

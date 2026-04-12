@@ -1,0 +1,87 @@
+{
+  "okr2-react-hook-guard": {
+    "type": "guardrail",
+    "enforcement": "block",
+    "priority": "critical",
+    "blockMessage": "⚠️ BLOCKED - React Hook 무한루프 방지\n\n📋 REQUIRED ACTIONS:\n1. useEffect deps 검증 필수\n2. ESLint exhaustive-deps 경고 확인\n3. 객체/함수 참조 제거 (userId, teamId 같은 primitive만)\n\n💡 자동 수정:\n- error-fixer Agent가 자동으로 수정 가능합니다\n- 또는 okr2-frontend-patterns Skill을 먼저 읽어주세요\n\n실제 사례: WeeklyOKRCard 무한루프 (2025-10-13)\n❌ useEffect(() => {...}, [api.method, data])\n✅ useEffect(() => {...}, [userId, teamId])",
+    "promptTriggers": {
+      "keywords": ["useEffect", "useState", "useCallback", "useMemo", "Hook", "React", "컴포넌트", "렌더링", "무한루프"],
+      "intentPatterns": [
+        "(추가|생성).*?(useEffect|Hook|컴포넌트)",
+        "(수정|변경).*?(useEffect|Hook)",
+        "데이터.*?가져오"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["apps/frontend/src/**/*.tsx", "apps/frontend/src/**/*.ts"],
+      "contentPatterns": ["useEffect\\(", "useState\\(", "useCallback\\(", "useMemo\\("]
+    },
+    "skipConditions": {
+      "sessionSkillUsed": "okr2-frontend-patterns",
+      "fileMarkers": ["@skip-hook-validation"],
+      "envOverride": "SKIP_REACT_HOOK_GUARD"
+    }
+  },
+
+  "okr2-db-schema-guard": {
+    "type": "guardrail",
+    "enforcement": "block",
+    "priority": "critical",
+    "blockMessage": "⚠️ BLOCKED - DB 스키마 prefix 필수\n\n📋 REQUIRED ACTIONS:\n1. 모든 SQL 쿼리: sparknote.table_name 형식 사용\n2. Prisma model: @@schema(\"sparknote\") 추가\n3. public 스키마 암묵적 의존 금지\n\n💡 올바른 예시:\n✅ SELECT * FROM sparknote.campaigns WHERE status = 'active'\n✅ model Campaign {\n     @@schema(\"sparknote\")\n   }\n\n❌ 잘못된 예시:\n❌ SELECT * FROM campaigns  // ERROR: relation \"campaigns\" does not exist\n\n상세 가이드: docs/analysis/database-schema.md",
+    "promptTriggers": {
+      "keywords": ["테이블", "스키마", "Prisma", "migration", "마이그레이션", "DDL", "ALTER", "CREATE TABLE", "DB"],
+      "intentPatterns": [
+        "(추가|생성).*?(테이블|컬럼|필드)",
+        "(수정|변경).*?(스키마|테이블)",
+        "migration.*?(생성|추가)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [
+        "apps/backend/prisma/**/*.prisma",
+        "apps/backend/src/**/*.ts",
+        "apps/backend/prisma/migrations/**/*.sql"
+      ],
+      "contentPatterns": [
+        "SELECT.*FROM",
+        "INSERT.*INTO",
+        "UPDATE.*SET",
+        "DELETE.*FROM",
+        "CREATE TABLE",
+        "ALTER TABLE",
+        "model\\s+\\w+\\s*{"
+      ]
+    },
+    "skipConditions": {
+      "sessionSkillUsed": "okr2-backend-patterns",
+      "fileMarkers": ["@skip-schema-validation"],
+      "envOverride": "SKIP_DB_SCHEMA_GUARD"
+    }
+  },
+
+  "okr2-api-route-guard": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "message": "🎯 API Route 패턴 감지\n\n📋 Context 주입:\n- Next.js API Routes 표준 패턴\n- 환경 변수: API_BASE_URL || BACKEND_URL || NEXT_PUBLIC_BACKEND_URL\n- 인증: session.backendToken 사용\n- Admin Impersonation: X-Impersonate-User 헤더\n\n💡 일반적인 실수:\n1. DELETE 메서드 누락 → 405 Method Not Allowed\n2. 중첩 엔드포인트를 route.ts에 추가 → 404 (별도 디렉토리 필요)\n3. accessToken 사용 → backendToken 사용 필수\n\n상세 가이드: docs/patterns/fullstack/api-routes.md",
+    "promptTriggers": {
+      "keywords": ["API", "route", "endpoint", "백엔드", "프록시", "라우트"],
+      "intentPatterns": [
+        "(추가|생성|만들|구현).*?(API|엔드포인트|라우트)",
+        "(수정|변경).*?(API|엔드포인트)",
+        "DELETE.*?(메서드|method)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["apps/frontend/src/app/api/**/*.ts"]
+    },
+    "resources": [
+      "docs/patterns/fullstack/api-routes.md",
+      "docs/patterns/fullstack/admin-impersonation.md"
+    ],
+    "suggested_agent": "story-creator",
+    "skipConditions": {
+      "sessionSkillUsed": "okr2-backend-patterns"
+    }
+  }
+}

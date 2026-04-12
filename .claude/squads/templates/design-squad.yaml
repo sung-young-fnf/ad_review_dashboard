@@ -1,0 +1,71 @@
+# Design Squad - Task 분해 + 검증 + 플로우 분석 병렬 실행
+# 사용: Story→Task 분해, 대형 Story의 Task 품질 보장
+# WHY: task-planner 단독 → validator/flow-analyzer 순차 실행 = 느림 → 병렬로 40% 절감
+name: design-squad
+scale: DESIGN
+description: "Task 분해와 검증을 병렬로 수행하여 설계 품질을 빠르게 보장하는 편대"
+team_size: 2-3
+estimated_time: "10-20분"
+trigger_keywords: [설계 스쿼드, design squad, task 분해, 대형 스토리]
+
+# 트리거 조건 (하나라도 충족 시)
+triggers:
+  - "Story의 Task 예상 5개+"
+  - "Story AC가 복잡 (검증 관점 다양)"
+  - "크로스 도메인 Story (Backend + Frontend + DB)"
+  - "사용자 흐름이 복잡 (분기 3개+)"
+  - "명시적 설계 스쿼드 요청"
+
+roles:
+  - name: design-architect
+    agent_type: "general-purpose"
+    role: LEAD
+    system_prompt_ref: ".claude/squads/roles/design-architect.md"
+    responsibilities:
+      - "Story 분석 → Task 분해 전략 수립"
+      - "task-planner 실행 → Task 문서 생성"
+      - "Validator/Flow Analyzer 결과 종합"
+      - "Task 간 의존성 최적화"
+      - "최종 Task 문서 확정"
+
+  - name: task-validator
+    agent_type: "03-design/task-validator"
+    role: MEMBER
+    responsibilities:
+      - "Task AC가 Story AC를 완전히 커버하는지 검증"
+      - "순환 의존성 감지"
+      - "Task 크기 적정성 검증 (너무 크거나 작은 Task)"
+
+  - name: flow-analyzer
+    agent_type: "03-design/spec-flow-analyzer"
+    role: MEMBER
+    optional: true
+    condition: "사용자 흐름이 포함된 Story일 때"
+    responsibilities:
+      - "사용자 플로우 완전성 분석 (permutation/gap 발견)"
+      - "에러 복구 경로 확인"
+      - "엣지 케이스 식별"
+
+task_flow:
+  - step: 1
+    actor: design-architect
+    action: "Story 분석 → Task 분해 초안 작성 (task-planner 실행)"
+  - step: 2a
+    actor: task-validator
+    action: "(병렬) Task AC 커버리지 + 의존성 + 크기 검증"
+    parallel: true
+  - step: 2b
+    actor: flow-analyzer
+    action: "(병렬) 사용자 플로우 완전성 분석 → gap/edge case 보고"
+    parallel: true
+  - step: 3
+    actor: design-architect
+    action: "검증 결과 반영 → Task 수정/보완 → 최종 확정"
+
+completion_condition:
+  - "모든 Task 문서 생성 완료"
+  - "task-validator 통과 (AC 커버리지 100%)"
+  - "(플로우 포함 시) flow-analyzer 검증 완료"
+  - "Task 간 의존성 DAG 확인 (순환 없음)"
+
+cost_multiplier: 2x

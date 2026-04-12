@@ -1,0 +1,91 @@
+# Quality Squad - 구현 후 4개 검증 Agent 병렬 실행
+# 사용: Story/Epic 구현 완료 후, 대형 릴리즈 전 검증
+# WHY: 순차 검증 ~17분 → 병렬 ~5분 (3.4x 시간 절감)
+name: quality-squad
+scale: QUALITY
+description: "구현 완료 후 4개 품질 검증 Agent를 병렬 실행하여 빠르게 품질 게이트를 통과하는 편대"
+team_size: 3-4
+estimated_time: "5-10분"
+trigger_keywords: [품질 검증, quality squad, 릴리즈 검증, 전수 검증, 코드 리뷰 스쿼드]
+
+# 트리거 조건 (하나라도 충족 시)
+triggers:
+  - "Epic 구현 완료 (전체 품질 검증 필요)"
+  - "대형 Story 구현 완료 (5+ Task)"
+  - "릴리즈 전 최종 검증"
+  - "보안 감사 필요"
+  - "성능 이슈 의심"
+  - "명시적 품질 스쿼드 요청"
+
+roles:
+  - name: quality-lead
+    agent_type: "general-purpose"
+    role: LEAD
+    system_prompt_ref: ".claude/squads/roles/quality-lead.md"
+    responsibilities:
+      - "검증 범위 정의 및 Agent 디스패치"
+      - "검증 결과 종합 → 통합 품질 보고서 작성"
+      - "P0/P1 이슈 식별 및 즉시 수정 트리거"
+      - "품질 점수 산출 (통과/실패 판정)"
+
+  - name: impl-validator
+    agent_type: "general-purpose"
+    role: MEMBER
+    responsibilities:
+      - "Task AC 달성 검증"
+      - "API 체인 무결성 (Frontend→BFF→Backend→DB)"
+      - "DB 컬럼/타입 일치 확인"
+      - "에러 발견 시 error-fixer 위임"
+
+  - name: perf-checker
+    agent_type: "general-purpose"
+    role: MEMBER
+    optional: true
+    condition: "성능 민감 기능이거나 DB 쿼리 포함 시"
+    responsibilities:
+      - "N+1 쿼리 감지"
+      - "Big-O 복잡도 검증"
+      - "번들 사이즈 영향 측정"
+      - "메모리 누수 패턴 감지"
+
+  - name: security-checker
+    agent_type: "general-purpose"
+    role: MEMBER
+    optional: true
+    condition: "인증/인가/데이터 처리 관련 변경 시"
+    responsibilities:
+      - "OWASP Top 10 취약점 스캔"
+      - "인증/인가 바이패스 검증"
+      - "민감정보 노출 검사 (하드코딩 시크릿 등)"
+
+# 추가 Solo Agent (Quality Lead가 조건부 디스패치)
+conditional_agents:
+  - agent_type: "05-quality/code-simplicity-reviewer"
+    condition: "100줄+ 구현일 때"
+    purpose: "YAGNI 위반, 불필요한 복잡성 감지"
+  - agent_type: "04-implementation/ui-tester"
+    condition: "UI 변경 포함 시"
+    purpose: "Before/After 비교 검증, WCAG 2.2 AA"
+
+task_flow:
+  - step: 1
+    actor: quality-lead
+    action: "변경 범위 파악 → 검증 대상 선정 → 필요 Agent 결정"
+  - step: 2
+    actor: "[모든 Member + conditional_agents]"
+    action: "(병렬) 각 검증 영역 독립 실행"
+    parallel: true
+  - step: 3
+    actor: quality-lead
+    action: "검증 결과 수집 → P0 이슈 있으면 error-fixer 즉시 위임"
+  - step: 4
+    actor: quality-lead
+    action: "통합 품질 보고서 작성 → 통과/실패 판정 → Main Thread 보고"
+
+completion_condition:
+  - "모든 검증 Agent 완료 보고"
+  - "P0 이슈 0건 (있으면 수정 완료까지 대기)"
+  - "통합 품질 보고서 작성 완료"
+  - "품질 점수 산출 완료"
+
+cost_multiplier: 2.5x
