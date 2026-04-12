@@ -1,0 +1,6 @@
+apiVersion: v2
+name: {{APP_NAME}}
+description: {{APP_NAME}} - Kubernetes deployment
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

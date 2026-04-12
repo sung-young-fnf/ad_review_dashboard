@@ -1,0 +1,13 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // DBUSER 정책: 전용 스키마, public 금지
+  schemas  = ["{{APP_NAME_SNAKE}}"]
+}
+
+// 모델 정의는 여기부터 추가
+// 모든 모델에 @@schema("{{APP_NAME_SNAKE}}") 필수

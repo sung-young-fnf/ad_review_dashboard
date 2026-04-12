@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "postgres-{app-name}-local": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "enhanced-postgres-mcp-server",
+        "postgresql://{app_name}_svc:changeme@localhost:5432/{app_name}_db"
+      ]
+    }
+  }
+}

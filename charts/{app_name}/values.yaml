@@ -1,0 +1,38 @@
+namespace: {{APP_NAME_SNAKE}}
+
+backend:
+  replicaCount: 1
+  image:
+    repository: ""
+    tag: latest
+  port: 8000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env: []
+
+frontend:
+  replicaCount: 1
+  image:
+    repository: ""
+    tag: latest
+  port: {{FRONTEND_PORT}}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+  env:
+    - name: BACKEND_URL
+      value: "http://{{APP_NAME}}-backend:8000"
+
+ingress:
+  enabled: true
+  host: {{APP_NAME}}.fnf.co.kr
+  tls: true
