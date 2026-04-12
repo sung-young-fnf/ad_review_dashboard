@@ -245,10 +245,10 @@ if [[ "$SSO_ENABLED" == "true" ]]; then
     cat >> "$APP_DIR/backend/.env.example" << EOF
 
 # Microsoft Entra ID SSO
-${APP_SNAKE^^}_ENTRA_CLIENT_ID=your-client-id
-${APP_SNAKE^^}_ENTRA_CLIENT_SECRET=your-client-secret
-${APP_SNAKE^^}_ENTRA_TENANT_ID=your-tenant-id
-${APP_SNAKE^^}_ENTRA_REDIRECT_URI=http://localhost:${FRONTEND_PORT}/api/auth/callback
+$(echo "${APP_SNAKE}" | tr '[:lower:]' '[:upper:]')_ENTRA_CLIENT_ID=your-client-id
+$(echo "${APP_SNAKE}" | tr '[:lower:]' '[:upper:]')_ENTRA_CLIENT_SECRET=your-client-secret
+$(echo "${APP_SNAKE}" | tr '[:lower:]' '[:upper:]')_ENTRA_TENANT_ID=your-tenant-id
+$(echo "${APP_SNAKE}" | tr '[:lower:]' '[:upper:]')_ENTRA_REDIRECT_URI=http://localhost:${FRONTEND_PORT}/api/auth/callback
 EOF
   else
     cat >> "$APP_DIR/backend/.env.example" << EOF
