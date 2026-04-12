@@ -275,26 +275,36 @@ export async function GET() {
 }
 EOF
 
-  # Login page
+  # Login page (next-auth signIn)
   mkdir -p "$APP_DIR/frontend/src/app/(public)/login"
-  cat > "$APP_DIR/frontend/src/app/(public)/login/page.tsx" << EOF
+  cat > "$APP_DIR/frontend/src/app/(public)/login/page.tsx" << 'LOGINEOF'
+'use client';
+
+import { signIn } from 'next-auth/react';
+
 export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-sm space-y-6 text-center">
-        <h1 className="text-3xl font-bold">${APP_NAME}</h1>
+        <h1 className="text-3xl font-bold">APP_NAME_PLACEHOLDER</h1>
         <p className="text-gray-500">Microsoft 계정으로 로그인하세요</p>
-        <a
-          href="/api/auth/login"
-          className="inline-block w-full rounded-lg bg-blue-600 px-6 py-3 text-white font-medium hover:bg-blue-700"
+        <button
+          onClick={() => signIn('azure-ad', { callbackUrl: '/' })}
+          className="w-full rounded-lg bg-blue-600 px-6 py-3 text-white font-medium hover:bg-blue-700"
         >
           Microsoft 계정으로 로그인
-        </a>
+        </button>
       </div>
     </div>
   );
 }
-EOF
+LOGINEOF
+  # heredoc 내부에서 변수 치환이 안 되므로 sed로 별도 치환
+  if [[ "$(uname)" == "Darwin" ]]; then
+    sed -i '' "s/APP_NAME_PLACEHOLDER/$APP_NAME/g" "$APP_DIR/frontend/src/app/(public)/login/page.tsx"
+  else
+    sed -i "s/APP_NAME_PLACEHOLDER/$APP_NAME/g" "$APP_DIR/frontend/src/app/(public)/login/page.tsx"
+  fi
 fi
 
 # ─── 4. DESIGN.md (optional) ───

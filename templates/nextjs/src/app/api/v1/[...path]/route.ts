@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,12 +13,10 @@ type RouteContext = { params: Promise<{ path: string[] }> };
  *
  * Browser → /api/v1/{path} → Next.js Proxy → Backend (BACKEND_URL)
  *
- * - 모든 HTTP 메서드 지원 (GET/POST/PUT/PATCH/DELETE)
- * - SSE 스트리밍 응답 ReadableStream 직접 전달
- * - 서버사이드 인증 (session.accessToken)
+ * - 모든 HTTP 메서드 (GET/POST/PUT/PATCH/DELETE)
+ * - SSE 스트리밍 ReadableStream 직접 전달
+ * - 서버사이드 인증: session.accessToken → Bearer 토큰
  * - Query params 그대로 전달
- *
- * TODO: auth() 미들웨어 추가 (SSO 설정 시)
  */
 async function proxyRequest(
   request: NextRequest,
@@ -25,11 +24,18 @@ async function proxyRequest(
   method: string,
 ): Promise<Response> {
   try {
-    // TODO: SSO 설정 시 아래 주석 해제
-    // const session = await auth();
-    // if (!session?.accessToken) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    // }
+    const session = await auth();
+
+    if (session?.error === 'RefreshAccessTokenError') {
+      return NextResponse.json(
+        { error: 'Session expired. Please re-login.', code: 'TOKEN_REFRESH_FAILED' },
+        { status: 401 },
+      );
+    }
+
+    if (!session?.accessToken) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const { path } = await context.params;
     const pathStr = path.join('/');
@@ -37,8 +43,7 @@ async function proxyRequest(
     const url = `${BACKEND_URL}/api/${pathStr}${query ? `?${query}` : ''}`;
 
     const headers = new Headers();
-    // TODO: SSO 설정 시 Bearer 토큰 추가
-    // headers.set('Authorization', `Bearer ${session.accessToken}`);
+    headers.set('Authorization', `Bearer ${session.accessToken}`);
 
     const contentType = request.headers.get('content-type');
     if (contentType) headers.set('Content-Type', contentType);
