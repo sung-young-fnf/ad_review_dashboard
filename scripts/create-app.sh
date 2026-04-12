@@ -238,9 +238,27 @@ find "$APP_DIR/frontend" -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js
   replace_placeholders "$f"
 done
 
-# ─── 3. MS SSO (optional) ───
+# ─── 3. Auth mode (SSO vs No-Auth) ───
 if [[ "$SSO_ENABLED" == "true" ]]; then
-  echo "🔐 MS Entra ID SSO 템플릿 추가..."
+  echo "🔐 Auth: MS Entra ID SSO..."
+  # SSO auth.ts 사용 (이미 템플릿에서 복사됨 — auth-sso.ts가 원본)
+  cp "$APP_DIR/frontend/src/lib/auth-modes/auth-sso.ts" "$APP_DIR/frontend/src/lib/auth.ts"
+else
+  echo "🔓 Auth: No-Auth (개발 모드)..."
+  # 더미 auth.ts 사용 — 로그인 없이 바로 진입
+  cp "$APP_DIR/frontend/src/lib/auth-modes/auth-none.ts" "$APP_DIR/frontend/src/lib/auth.ts"
+  # middleware.ts 제거 (라우트 보호 불필요)
+  rm -f "$APP_DIR/frontend/src/middleware.ts"
+  # 로그인 페이지 → 홈으로 redirect
+  mkdir -p "$APP_DIR/frontend/src/app/(public)/login"
+  cat > "$APP_DIR/frontend/src/app/(public)/login/page.tsx" << 'NOLOGINEOF'
+import { redirect } from 'next/navigation';
+export default function LoginPage() { redirect('/admin/users'); }
+NOLOGINEOF
+fi
+
+if [[ "$SSO_ENABLED" == "true" ]]; then
+  echo "  SSO .env 추가..."
 
   # Backend SSO config
   if [[ "$BACKEND_TYPE" == "fastapi" ]]; then
