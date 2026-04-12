@@ -22,9 +22,12 @@ else
   sed -i "s/{{PROJECT_DESCRIPTION}}/$PROJECT_DESC/g" "$ROOT_DIR/package.json"
 fi
 
-# Initialize git
+# Remove template remote + reinitialize git
 cd "$ROOT_DIR"
-if [ ! -d .git ]; then
+if [ -d .git ]; then
+  git remote remove origin 2>/dev/null || true
+  echo "✅ Template remote 제거됨"
+else
   git init
   echo "✅ Git initialized"
 fi
@@ -44,3 +47,7 @@ echo "Next steps:"
 echo "  1. Create an app:  ./scripts/create-app.sh <app-name> <fastapi|nestjs>"
 echo "  2. Start dev:      pnpm dev"
 echo "  3. Build:          pnpm build"
+echo ""
+echo "Git remote:"
+echo "  git remote add origin https://github.com/your-org/$PROJECT_NAME.git"
+echo "  git push -u origin main"
