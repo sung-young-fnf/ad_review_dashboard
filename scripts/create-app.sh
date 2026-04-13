@@ -342,7 +342,17 @@ find "$CHART_DIR" -type f | while read -r f; do
   replace_placeholders "$f"
 done
 
-# ─── 6. .mcp.json (DB MCP Server) ───
+# ─── 6. GitHub Actions deploy workflow ───
+echo "🚀 CI/CD workflow..."
+DEPLOY_TEMPLATE="$ROOT_DIR/.github/workflows/deploy-template.yml"
+DEPLOY_TARGET="$ROOT_DIR/.github/workflows/deploy-${APP_NAME}.yml"
+if [ -f "$DEPLOY_TEMPLATE" ] && [ ! -f "$DEPLOY_TARGET" ]; then
+  cp "$DEPLOY_TEMPLATE" "$DEPLOY_TARGET"
+  replace_placeholders "$DEPLOY_TARGET"
+  echo -e "  ${GREEN}✅ .github/workflows/deploy-${APP_NAME}.yml 생성됨${RESET}"
+fi
+
+# ─── 7. .mcp.json (DB MCP Server) ───
 echo "🗄️  .mcp.json DB MCP 추가..."
 MCP_JSON="$ROOT_DIR/.mcp.json"
 MCP_LOCAL_KEY="postgres-${APP_NAME}-local"
@@ -381,7 +391,7 @@ MCPEOF
   echo -e "  ${GREEN}✅ .mcp.json 생성됨 (${MCP_LOCAL_KEY})${RESET}"
 fi
 
-# ─── 7. App CLAUDE.md ───
+# ─── 8. App CLAUDE.md ───
 echo "🤖 CLAUDE.md..."
 cat > "$APP_DIR/CLAUDE.md" << EOF
 # ${APP_NAME}
@@ -415,6 +425,7 @@ echo "  ├── frontend/     (Next.js 16)"
 [[ "$SSO_ENABLED" == "true" ]] && echo "  ├── (SSO 포함)    Microsoft Entra ID"
 echo "  └── CLAUDE.md"
 echo "  charts/$APP_NAME/  (Helm)"
+echo "  .github/workflows/deploy-$APP_NAME.yml (CI/CD)"
 echo "  .mcp.json          (DB MCP: local)"
 echo ""
 echo -e "${BOLD}Next steps:${RESET}"

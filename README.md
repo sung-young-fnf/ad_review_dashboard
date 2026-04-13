@@ -162,6 +162,7 @@ Browser → /login → signIn('microsoft-entra-id')
 | `apps/{name}/CLAUDE.md` | 앱별 에이전트 가이드 (자동 생성) |
 | `apps/{name}/DESIGN.md` | AI 디자인 시스템 (--design 선택 시) |
 | `charts/{name}/` | Helm chart (Deployment + Service + Ingress + HPA) |
+| `.github/workflows/deploy-{name}.yml` | GitHub Actions 배포 워크플로우 (ECR push + Buildx) |
 | `.mcp.json` | PostgreSQL MCP 서버 (앱별 누적 추가) |
 
 ## AI 에이전트 시스템
