@@ -162,8 +162,40 @@ Browser → /login → signIn('microsoft-entra-id')
 | `apps/{name}/CLAUDE.md` | 앱별 에이전트 가이드 (자동 생성) |
 | `apps/{name}/DESIGN.md` | AI 디자인 시스템 (--design 선택 시) |
 | `charts/{name}/` | Helm chart (Deployment + Service + Ingress + HPA) |
-| `.github/workflows/deploy-{name}.yml` | GitHub Actions 배포 워크플로우 (ECR push + Buildx) |
+| `.github/workflows/{name}-backend-dev.yml` | Backend 배포 (ECR push + Buildx) |
+| `.github/workflows/{name}-frontend-dev.yml` | Frontend 배포 (ECR push + Buildx) |
 | `.mcp.json` | PostgreSQL MCP 서버 (앱별 누적 추가) |
+
+## 배포 전략
+
+### Dev 환경 (자동)
+
+```
+코드 변경 → PR 머지 → GitHub Actions 자동 빌드 → ECR 푸시 → ArgoCD 감지 → EKS 배포
+```
+
+- Backend 변경 시 `{app}-backend-dev.yml`만 실행 (Frontend 무영향)
+- Frontend 변경 시 `{app}-frontend-dev.yml`만 실행 (Backend 무영향)
+- 이미지 태그: `{short-sha}-{timestamp}` + `dev-latest`
+
+### Prd 환경 (태그 프로모션)
+
+```
+Dev 검증 완료 → Helm values에 이미지 태그 변경 → ArgoCD Sync → Prd 배포
+```
+
+- **별도 CI/CD 워크플로우 없음** — Dev 이미지를 그대로 사용
+- Helm `values-prd.yaml`에서 이미지 태그만 변경 (dev-latest → 특정 버전)
+- ArgoCD가 Git 변경 감지 → 자동 또는 수동 Sync
+
+### 필요한 GitHub 설정
+
+| Variable (environment: dev) | 설명 |
+|---|---|
+| `ECR_URL_BACKEND` | Backend ECR 레포 URL |
+| `ECR_URL_FRONTEND` | Frontend ECR 레포 URL |
+| `ROLE_ARN` | AWS OIDC 인증 Role ARN |
+| `AWS_REGION` | `ap-northeast-2` |
 
 ## AI 에이전트 시스템
 

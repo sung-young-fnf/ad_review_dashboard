@@ -9,24 +9,72 @@ K8s 기반 내부 개발 도구 모노레포
 
 | Layer | Tech |
 |-------|------|
-| Frontend (공통) | Next.js 16+ React 19 TypeScript |
+| Frontend (공통) | Next.js 16+ React 19 TypeScript (shadcn/ui) |
 | Backend (선택) | FastAPI (Python) 또는 NestJS (TypeScript) |
-| Infra | K8s, Helm, ArgoCD, GitHub Actions |
+| Auth | MS Entra ID SSO (NextAuth v5) 또는 No-Auth |
+| DB | PostgreSQL 15+ (pgvector, DBUSER 정책) |
+| Infra | K8s (EKS), Helm, ArgoCD, GitHub Actions |
 | Package | uv (Python) / pnpm (TypeScript) |
 
 ## 앱별 스택 감지
-- `apps/{app}/backend/pyproject.toml` 존재 → FastAPI
-- `apps/{app}/backend/package.json` + `nest-cli.json` 존재 → NestJS
+- `apps/{app}/backend/pyproject.toml` → FastAPI (SQLAlchemy + Alembic)
+- `apps/{app}/backend/nest-cli.json` → NestJS (Prisma)
+- `apps/{app}/CLAUDE.md` → 앱별 상세 규칙
 
 ## Commands
 ```bash
-pnpm dev          # 전체 dev
-pnpm build        # 전체 빌드
-pnpm create-app   # 새 앱 생성: ./scripts/create-app.sh <name> <fastapi|nestjs>
+pnpm dev            # 전체 dev
+pnpm build          # 전체 빌드
+./scripts/create-app.sh  # 새 앱 생성 (인터랙티브)
 ```
 
 ## Core Rules
-- BFF 필수: Browser → Next.js API Route → Backend (직접 호출 금지)
-- DB: public 스키마 금지 → `{서비스명}` 전용 스키마 (DBUSER 정책)
-- DB 계정: Owner 3단 분리 (_adm / _object_owner_role / _dml_role)
-- 앱 서비스 계정(_svc)은 DML 전용, DDL은 _ops 계정으로만
+
+### BFF 필수
+```
+Browser → Next.js /api/v1/[...path] → Backend
+```
+- ❌ 브라우저에서 Backend 직접 호출 금지
+- ✅ BFF proxy가 session.accessToken → Bearer 토큰으로 전달
+
+### DB 정책 (DBUSER)
+- ❌ public 스키마 금지 → `{서비스명}` 전용 스키마
+- ✅ Owner 3단 분리: `_adm` / `_object_owner_role` / `_dml_role`
+- ✅ 앱 런타임: `_svc` 계정 (DML 전용)
+- ✅ 마이그레이션: `_ops` 계정만 DDL 실행
+
+### 인증 모드
+- **No-Auth** (기본): 로그인 없이 바로 사용 (개발용)
+- **SSO** (--sso): MS Entra ID → NextAuth → JWT 세션
+- 전환: `cp src/lib/auth-modes/auth-sso.ts src/lib/auth.ts` + `.env` 설정
+
+### 빌트인 RBAC
+- User: SSO 자동등록, Admin 토글
+- Role: CRUD (AdminGuard)
+- Menu: 동적 사이드바 (역할 기반 필터링)
+- Guard: JwtAuthGuard (글로벌), AdminGuard, RolesGuard, @Roles()
+
+### 배포 전략
+- **Dev**: 코드 머지 → GitHub Actions 자동 빌드 → ECR → ArgoCD → EKS
+- **Prd**: Dev 이미지 태그를 Helm values에 프로모션 → ArgoCD Sync
+- Backend/Frontend 배포 워크플로우 분리 (독립 빌드)
+- 워크플로우: `.github/workflows/{app}-backend-dev.yml`, `{app}-frontend-dev.yml`
+
+### OpenAPI 타입 동기화
+- Backend DTO 변경 후 반드시:
+  - FastAPI: `uv run python scripts/export-openapi.py`
+  - NestJS: `./scripts/export-openapi.sh` (서버 실행 중)
+  - Frontend: `pnpm generate:api`
+
+## Post-Change Checklist
+1. `pnpm tsc --noEmit` (TypeScript 체크)
+2. Backend DTO 변경 시 → OpenAPI 재생성
+3. 커밋 전 사용자 확인
+
+## Absolute Rules
+YAGNI | DRY | NO PARTIAL | NO DEAD CODE
+
+## Guides
+- `.claude/guides/` — 기술 가이드
+- `.claude/rules/` — 품질/워크플로우 규칙
+- `docs/DBUSER-POLICY.md` — DB 계정 정책
