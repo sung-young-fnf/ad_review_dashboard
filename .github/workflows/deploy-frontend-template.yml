@@ -1,0 +1,72 @@
+# {{APP_NAME}} Frontend — Build & Push to ECR
+#
+# 필요한 GitHub Variables (environment: dev):
+#   ECR_URL_FRONTEND=xxxx.dkr.ecr.ap-northeast-2.amazonaws.com/repo-frontend
+#   ROLE_ARN=arn:aws:iam::xxxx:role/ecr-push-role
+#   AWS_REGION=ap-northeast-2
+
+name: "{{APP_NAME}} Frontend DEV"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "apps/{{APP_NAME}}/frontend/**"
+      - "packages/**"
+      - ".github/workflows/{{APP_NAME}}-frontend-dev.yml"
+
+concurrency:
+  group: "{{APP_NAME}}-frontend-dev-${{ github.ref }}"
+  cancel-in-progress: false
+
+jobs:
+  build-and-push:
+    name: "Build Frontend"
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      id-token: write
+      contents: read
+
+    outputs:
+      image_tag: ${{ steps.tag.outputs.image_tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: tag
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          echo "image_tag=${SHORT_SHA}-${TIMESTAMP}" >> $GITHUB_OUTPUT
+
+      - uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            network=host
+            image=moby/buildkit:latest
+
+      - name: AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          audience: sts.amazonaws.com
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ vars.ROLE_ARN }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push
+        uses: docker/build-push-action@v5
+        env:
+          DOCKER_BUILDKIT: 1
+        with:
+          context: .
+          file: apps/{{APP_NAME}}/frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ vars.ECR_URL_FRONTEND }}:dev-latest
+            ${{ vars.ECR_URL_FRONTEND }}:${{ steps.tag.outputs.image_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

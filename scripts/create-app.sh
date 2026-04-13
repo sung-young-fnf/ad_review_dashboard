@@ -342,14 +342,26 @@ find "$CHART_DIR" -type f | while read -r f; do
   replace_placeholders "$f"
 done
 
-# ─── 6. GitHub Actions deploy workflow ───
-echo "🚀 CI/CD workflow..."
-DEPLOY_TEMPLATE="$ROOT_DIR/.github/workflows/deploy-template.yml"
-DEPLOY_TARGET="$ROOT_DIR/.github/workflows/deploy-${APP_NAME}.yml"
-if [ -f "$DEPLOY_TEMPLATE" ] && [ ! -f "$DEPLOY_TARGET" ]; then
-  cp "$DEPLOY_TEMPLATE" "$DEPLOY_TARGET"
-  replace_placeholders "$DEPLOY_TARGET"
-  echo -e "  ${GREEN}✅ .github/workflows/deploy-${APP_NAME}.yml 생성됨${RESET}"
+# ─── 6. GitHub Actions deploy workflows (backend + frontend 분리) ───
+echo "🚀 CI/CD workflows..."
+WF_DIR="$ROOT_DIR/.github/workflows"
+
+# Backend deploy (dev)
+BE_TEMPLATE="$WF_DIR/deploy-backend-template.yml"
+BE_TARGET="$WF_DIR/${APP_NAME}-backend-dev.yml"
+if [ -f "$BE_TEMPLATE" ] && [ ! -f "$BE_TARGET" ]; then
+  cp "$BE_TEMPLATE" "$BE_TARGET"
+  replace_placeholders "$BE_TARGET"
+  echo -e "  ${GREEN}✅ ${APP_NAME}-backend-dev.yml 생성됨${RESET}"
+fi
+
+# Frontend deploy (dev)
+FE_TEMPLATE="$WF_DIR/deploy-frontend-template.yml"
+FE_TARGET="$WF_DIR/${APP_NAME}-frontend-dev.yml"
+if [ -f "$FE_TEMPLATE" ] && [ ! -f "$FE_TARGET" ]; then
+  cp "$FE_TEMPLATE" "$FE_TARGET"
+  replace_placeholders "$FE_TARGET"
+  echo -e "  ${GREEN}✅ ${APP_NAME}-frontend-dev.yml 생성됨${RESET}"
 fi
 
 # ─── 7. .mcp.json (DB MCP Server) ───
@@ -425,7 +437,8 @@ echo "  ├── frontend/     (Next.js 16)"
 [[ "$SSO_ENABLED" == "true" ]] && echo "  ├── (SSO 포함)    Microsoft Entra ID"
 echo "  └── CLAUDE.md"
 echo "  charts/$APP_NAME/  (Helm)"
-echo "  .github/workflows/deploy-$APP_NAME.yml (CI/CD)"
+echo "  .github/workflows/${APP_NAME}-backend-dev.yml (CI/CD)"
+echo "  .github/workflows/${APP_NAME}-frontend-dev.yml (CI/CD)"
 echo "  .mcp.json          (DB MCP: local)"
 echo ""
 echo -e "${BOLD}Next steps:${RESET}"
