@@ -1,0 +1,100 @@
+# {{APP_NAME}} — Promote Dev → Prd
+# Dev에서 검증된 이미지 태그를 values-prd.yaml에 반영
+# 빌드 없음 — 태그만 변경 → ArgoCD 자동 sync
+#
+# 사용: Actions → workflow_dispatch → 태그 입력 (또는 자동 읽기)
+
+name: "{{APP_NAME}} Promote to Prd"
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_tag:
+        description: 'Backend 태그 (비우면 values-dev.yaml에서 자동 읽기)'
+        required: false
+        type: string
+      frontend_tag:
+        description: 'Frontend 태그 (비우면 values-dev.yaml에서 자동 읽기)'
+        required: false
+        type: string
+      confirm:
+        description: '운영 배포 진행 (yes 입력)'
+        required: true
+        type: string
+
+concurrency:
+  group: "{{APP_NAME}}-promote-prd"
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote Dev → Prd
+    runs-on: ubuntu-latest
+    environment: prd
+    if: ${{ github.event.inputs.confirm == 'yes' }}
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve image tags from Dev
+        id: tags
+        run: |
+          BACKEND_TAG="${{ inputs.backend_tag }}"
+          FRONTEND_TAG="${{ inputs.frontend_tag }}"
+
+          if [ -z "$BACKEND_TAG" ]; then
+            BACKEND_TAG=$(sed -n '/^backend:/,/^frontend:/{ /tag:/{ s/.*tag: "\(.*\)".*/\1/p; q; } }' charts/{{APP_NAME}}/values-dev.yaml 2>/dev/null || echo "")
+            if [ -z "$BACKEND_TAG" ]; then
+              echo "❌ Backend tag not found in values-dev.yaml"
+              exit 1
+            fi
+          fi
+          if [ -z "$FRONTEND_TAG" ]; then
+            FRONTEND_TAG=$(sed -n '/^frontend:/,/^ingress:/{ /tag:/{ s/.*tag: "\(.*\)".*/\1/p; q; } }' charts/{{APP_NAME}}/values-dev.yaml 2>/dev/null || echo "")
+            if [ -z "$FRONTEND_TAG" ]; then
+              echo "❌ Frontend tag not found in values-dev.yaml"
+              exit 1
+            fi
+          fi
+
+          echo "backend_tag=${BACKEND_TAG}" >> $GITHUB_OUTPUT
+          echo "frontend_tag=${FRONTEND_TAG}" >> $GITHUB_OUTPUT
+          echo "📦 Backend:  ${BACKEND_TAG}"
+          echo "📦 Frontend: ${FRONTEND_TAG}"
+
+      - name: Update values-prd.yaml
+        run: |
+          BACKEND_TAG="${{ steps.tags.outputs.backend_tag }}"
+          FRONTEND_TAG="${{ steps.tags.outputs.frontend_tag }}"
+          VALUES_FILE="charts/{{APP_NAME}}/values-prd.yaml"
+
+          sed -i '/^backend:/,/^frontend:/ s/tag: .*/tag: "'"${BACKEND_TAG}"'"/' ${VALUES_FILE}
+          sed -i '/^frontend:/,$ s/tag: .*/tag: "'"${FRONTEND_TAG}"'"/' ${VALUES_FILE}
+
+          echo "Updated → Backend: ${BACKEND_TAG}, Frontend: ${FRONTEND_TAG}"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          BACKEND_TAG="${{ steps.tags.outputs.backend_tag }}"
+          FRONTEND_TAG="${{ steps.tags.outputs.frontend_tag }}"
+
+          git add charts/{{APP_NAME}}/values-prd.yaml
+          git diff --staged --quiet || git commit -m "chore(deploy): {{APP_NAME}} promote to prd (be:${BACKEND_TAG}, fe:${FRONTEND_TAG})"
+          for i in {1..3}; do
+            git pull --rebase origin ${{ github.ref_name }} && git push origin ${{ github.ref_name }} && break
+            sleep $((i * 2))
+          done
+
+      - name: Summary
+        run: |
+          echo "🚀 {{APP_NAME}} Prd Promotion Complete!"
+          echo "Backend:  ${{ steps.tags.outputs.backend_tag }}"
+          echo "Frontend: ${{ steps.tags.outputs.frontend_tag }}"
+          echo "ArgoCD will automatically sync when values-prd.yaml is updated."
