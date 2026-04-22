@@ -66,6 +66,13 @@ Browser → Next.js /api/v1/[...path] → Backend
   - NestJS: `./scripts/export-openapi.sh` (서버 실행 중)
   - Frontend: `pnpm generate:api`
 
+### Datadog APM (자동 주입)
+- 본 템플릿으로 생성된 서비스는 Datadog Admission Controller 자동 주입으로 APM 수집 (`charts/{app}/values.yaml` 의 `backend.apm` / `frontend.apm`).
+- 전제: cluster 측 `datadog.apm.instrumentation.enabled=true` + `admissionController.enabled=true`.
+- ddtrace 라이브러리 버전은 Helm annotation (`admission.datadoghq.com/<lang>-lib.version`) 으로 관리 — **Dockerfile / requirements.txt / package.json 에 ddtrace 추가 금지**.
+- `language` 기본값: FastAPI → `python`, NestJS → `js` (create-app.sh 가 backend 스택에 맞춰 자동 설정).
+- 비활성화: `backend.apm.enabled=false` 또는 `frontend.apm.enabled=false`.
+
 ## Post-Change Checklist
 1. `pnpm tsc --noEmit` (TypeScript 체크)
 2. Backend DTO 변경 시 → OpenAPI 재생성

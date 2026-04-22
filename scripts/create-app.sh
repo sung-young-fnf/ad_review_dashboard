@@ -349,6 +349,22 @@ find "$CHART_DIR" -type f | while read -r f; do
   replace_placeholders "$f"
 done
 
+# Datadog APM: backend language 를 백엔드 스택에 맞춰 전환
+# values.yaml 기본은 python(FastAPI). NestJS 일 경우 js 로 교체.
+if [[ "$BACKEND_TYPE" == "nestjs" ]]; then
+  if [[ "$(uname)" == "Darwin" ]]; then
+    sed -i '' \
+      -e '/^backend:/,/^frontend:/ s/language: python/language: js/' \
+      -e '/^backend:/,/^frontend:/ s/libVersion: "v3.0.0"/libVersion: "v5.0.0"/' \
+      "$CHART_DIR/values.yaml"
+  else
+    sed -i \
+      -e '/^backend:/,/^frontend:/ s/language: python/language: js/' \
+      -e '/^backend:/,/^frontend:/ s/libVersion: "v3.0.0"/libVersion: "v5.0.0"/' \
+      "$CHART_DIR/values.yaml"
+  fi
+fi
+
 # ─── 5.5. ArgoCD Application CR (Hybrid GitOps 패턴) ───
 echo "🎯 ArgoCD Application..."
 ARGOCD_DIR="$ROOT_DIR/argocd"

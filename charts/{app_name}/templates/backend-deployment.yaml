@@ -17,6 +17,19 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: {{ "{{ include \"app.fullname\" . }}" }}-backend
+        app.kubernetes.io/component: backend
+        {{- "{{ if .Values.backend.apm.enabled }}" }}
+        # Datadog APM auto-instrumentation (admission controller label-based)
+        admission.datadoghq.com/enabled: "true"
+        tags.datadoghq.com/service: "{{ "{{ include \"app.fullname\" . }}" }}-backend"
+        tags.datadoghq.com/env: {{ "{{ .Values.global.environment | quote }}" }}
+        tags.datadoghq.com/version: {{ "{{ .Values.backend.image.tag | default .Chart.AppVersion | quote }}" }}
+        {{- "{{ end }}" }}
+      {{- "{{ if .Values.backend.apm.enabled }}" }}
+      annotations:
+        # ddtrace lib version — 인프라 전반 일괄 관리. Dockerfile/requirements 에 ddtrace 추가 금지.
+        admission.datadoghq.com/{{ "{{ .Values.backend.apm.language }}" }}-lib.version: {{ "{{ .Values.backend.apm.libVersion | quote }}" }}
+      {{- "{{ end }}" }}
     spec:
       {{- "{{ if .Values.backend.migration.enabled }}" }}
       initContainers:

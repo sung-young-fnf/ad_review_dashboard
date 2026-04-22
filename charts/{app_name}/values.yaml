@@ -9,6 +9,13 @@ backend:
     tag: latest
     pullPolicy: IfNotPresent
   port: 8000
+  # Datadog APM auto-instrumentation (admission controller label-based)
+  # cluster 측 admissionController.enabled=true 가 전제. ddtrace 라이브러리는 Dockerfile 에 추가하지 않고 annotation 으로만 관리.
+  # language: python (FastAPI) / js (NestJS) / java / dotnet / ruby
+  apm:
+    enabled: true
+    language: python
+    libVersion: "v3.0.0"
   resources:
     requests:
       cpu: 100m
@@ -58,6 +65,11 @@ frontend:
     tag: latest
     pullPolicy: IfNotPresent
   port: 3000
+  # Datadog APM auto-instrumentation (Next.js = js-lib)
+  apm:
+    enabled: true
+    language: js
+    libVersion: "v5.0.0"
   resources:
     requests:
       cpu: 100m
