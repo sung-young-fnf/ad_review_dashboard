@@ -85,11 +85,17 @@ replace_placeholders() {
   local project_name
   project_name=$(grep '"name"' "$ROOT_DIR/package.json" | head -1 | sed 's/.*"\(.*\)".*/\1/' | sed 's/.*: *"//' | sed 's/".*//')
 
+  # git remote origin에서 repo 이름 추출 (없으면 project_name fallback)
+  local repo_name
+  repo_name=$(cd "$ROOT_DIR" && git remote get-url origin 2>/dev/null | sed -E 's#.*/([^/]+?)(\.git)?$#\1#' || true)
+  repo_name="${repo_name:-$project_name}"
+
   if [[ "$(uname)" == "Darwin" ]]; then
     sed -i '' \
       -e "s/{{APP_NAME}}/$APP_NAME/g" \
       -e "s/{{APP_NAME_SNAKE}}/$APP_SNAKE/g" \
       -e "s/{{PROJECT_NAME}}/$project_name/g" \
+      -e "s/{{REPO_NAME}}/$repo_name/g" \
       -e "s/{{BACKEND_PORT}}/8000/g" \
       -e "s/{{FRONTEND_PORT}}/$FRONTEND_PORT/g" \
       -e "s/{{SSO_ENABLED}}/$SSO_ENABLED/g" \
@@ -99,6 +105,7 @@ replace_placeholders() {
       -e "s/{{APP_NAME}}/$APP_NAME/g" \
       -e "s/{{APP_NAME_SNAKE}}/$APP_SNAKE/g" \
       -e "s/{{PROJECT_NAME}}/$project_name/g" \
+      -e "s/{{REPO_NAME}}/$repo_name/g" \
       -e "s/{{BACKEND_PORT}}/8000/g" \
       -e "s/{{FRONTEND_PORT}}/$FRONTEND_PORT/g" \
       -e "s/{{SSO_ENABLED}}/$SSO_ENABLED/g" \
@@ -342,6 +349,19 @@ find "$CHART_DIR" -type f | while read -r f; do
   replace_placeholders "$f"
 done
 
+# ─── 5.5. ArgoCD Application CR (Hybrid GitOps 패턴) ───
+echo "🎯 ArgoCD Application..."
+ARGOCD_DIR="$ROOT_DIR/argocd"
+for env in dev prd; do
+  SRC="$ARGOCD_DIR/{app_name}-${env}.yaml"
+  DST="$ARGOCD_DIR/${APP_NAME}-${env}.yaml"
+  if [ -f "$SRC" ] && [ ! -f "$DST" ]; then
+    cp "$SRC" "$DST"
+    replace_placeholders "$DST"
+    echo -e "  ${GREEN}✅ argocd/${APP_NAME}-${env}.yaml 생성됨${RESET}"
+  fi
+done
+
 # ─── 6. GitHub Actions deploy workflows (backend + frontend 분리) ───
 echo "🚀 CI/CD workflows..."
 WF_DIR="$ROOT_DIR/.github/workflows"
@@ -437,6 +457,8 @@ echo "  ├── frontend/     (Next.js 16)"
 [[ "$SSO_ENABLED" == "true" ]] && echo "  ├── (SSO 포함)    Microsoft Entra ID"
 echo "  └── CLAUDE.md"
 echo "  charts/$APP_NAME/  (Helm)"
+echo "  argocd/${APP_NAME}-dev.yaml  (ArgoCD Application — dev)"
+echo "  argocd/${APP_NAME}-prd.yaml  (ArgoCD Application — prd)"
 echo "  .github/workflows/${APP_NAME}-backend-dev.yml (CI/CD)"
 echo "  .github/workflows/${APP_NAME}-frontend-dev.yml (CI/CD)"
 echo "  .mcp.json          (DB MCP: local)"

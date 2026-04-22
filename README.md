@@ -47,6 +47,9 @@ fnf-mono-starter/
 │       ├── DESIGN.md              # AI 디자인 시스템 (선택)
 │       └── CLAUDE.md              # 앱별 에이전트 가이드
 ├── charts/{app-name}/             # Helm chart (Deploy/Service/Ingress/HPA)
+├── argocd/                        # ArgoCD Application CR (하이브리드 GitOps)
+│   ├── {app-name}-dev.yaml        # develop 브랜치, prune=true
+│   └── {app-name}-prd.yaml        # main 브랜치, prune=false (수동 승인)
 ├── templates/                     # 앱 템플릿 원본
 │   ├── fastapi/                   # Python backend
 │   ├── nestjs/                    # TypeScript backend

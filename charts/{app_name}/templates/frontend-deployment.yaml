@@ -7,7 +7,9 @@ metadata:
     {{- "{{ include \"app.labels\" . | nindent 4 }}" }}
     app.kubernetes.io/component: frontend
 spec:
+  {{- "{{ if not .Values.frontend.autoscaling.enabled }}" }}
   replicas: {{ "{{ .Values.frontend.replicaCount }}" }}
+  {{- "{{ end }}" }}
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ "{{ include \"app.fullname\" . }}" }}-frontend
@@ -24,6 +26,10 @@ spec:
             - containerPort: {{ "{{ .Values.frontend.port }}" }}
           env:
             {{- "{{ toYaml .Values.frontend.env | nindent 12 }}" }}
+          {{- "{{ with .Values.frontend.startupProbe }}" }}
+          startupProbe:
+            {{- "{{ toYaml . | nindent 12 }}" }}
+          {{- "{{ end }}" }}
           {{- "{{ with .Values.frontend.livenessProbe }}" }}
           livenessProbe:
             {{- "{{ toYaml . | nindent 12 }}" }}
