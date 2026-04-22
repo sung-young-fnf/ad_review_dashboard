@@ -12,10 +12,11 @@ backend:
   # Datadog APM auto-instrumentation (admission controller label-based)
   # cluster 측 admissionController.enabled=true 가 전제. ddtrace 라이브러리는 Dockerfile 에 추가하지 않고 annotation 으로만 관리.
   # language: python (FastAPI) / js (NestJS) / java / dotnet / ruby
+  # ⚠️ python v3.0.0 은 typing_extensions 이슈로 pydantic 최신과 충돌. v3.19.7+ 사용 필수.
   apm:
     enabled: true
     language: python
-    libVersion: "v3.0.0"
+    libVersion: "v3.19.7"
   resources:
     requests:
       cpu: 100m

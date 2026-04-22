@@ -355,12 +355,12 @@ if [[ "$BACKEND_TYPE" == "nestjs" ]]; then
   if [[ "$(uname)" == "Darwin" ]]; then
     sed -i '' \
       -e '/^backend:/,/^frontend:/ s/language: python/language: js/' \
-      -e '/^backend:/,/^frontend:/ s/libVersion: "v3.0.0"/libVersion: "v5.0.0"/' \
+      -e '/^backend:/,/^frontend:/ s/libVersion: "v3.19.7"/libVersion: "v5.0.0"/' \
       "$CHART_DIR/values.yaml"
   else
     sed -i \
       -e '/^backend:/,/^frontend:/ s/language: python/language: js/' \
-      -e '/^backend:/,/^frontend:/ s/libVersion: "v3.0.0"/libVersion: "v5.0.0"/' \
+      -e '/^backend:/,/^frontend:/ s/libVersion: "v3.19.7"/libVersion: "v5.0.0"/' \
       "$CHART_DIR/values.yaml"
   fi
 fi
