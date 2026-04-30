@@ -40,40 +40,40 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Resolve image tags from Dev
+      - name: Resolve image tags from Dev (yq — 정확한 path)
         id: tags
         run: |
           BACKEND_TAG="${{ inputs.backend_tag }}"
           FRONTEND_TAG="${{ inputs.frontend_tag }}"
 
           if [ -z "$BACKEND_TAG" ]; then
-            BACKEND_TAG=$(sed -n '/^backend:/,/^frontend:/{ /tag:/{ s/.*tag: "\(.*\)".*/\1/p; q; } }' charts/{{APP_NAME}}/values-dev.yaml 2>/dev/null || echo "")
-            if [ -z "$BACKEND_TAG" ]; then
-              echo "❌ Backend tag not found in values-dev.yaml"
+            BACKEND_TAG=$(yq e '.backend.image.tag' charts/{{APP_NAME}}/values-dev.yaml 2>/dev/null || echo "null")
+            if [ -z "$BACKEND_TAG" ] || [ "$BACKEND_TAG" = "null" ]; then
+              echo "::error::Backend tag not found at .backend.image.tag in values-dev.yaml"
               exit 1
             fi
           fi
           if [ -z "$FRONTEND_TAG" ]; then
-            FRONTEND_TAG=$(sed -n '/^frontend:/,/^ingress:/{ /tag:/{ s/.*tag: "\(.*\)".*/\1/p; q; } }' charts/{{APP_NAME}}/values-dev.yaml 2>/dev/null || echo "")
-            if [ -z "$FRONTEND_TAG" ]; then
-              echo "❌ Frontend tag not found in values-dev.yaml"
+            FRONTEND_TAG=$(yq e '.frontend.image.tag' charts/{{APP_NAME}}/values-dev.yaml 2>/dev/null || echo "null")
+            if [ -z "$FRONTEND_TAG" ] || [ "$FRONTEND_TAG" = "null" ]; then
+              echo "::error::Frontend tag not found at .frontend.image.tag in values-dev.yaml"
               exit 1
             fi
           fi
 
           echo "backend_tag=${BACKEND_TAG}" >> $GITHUB_OUTPUT
           echo "frontend_tag=${FRONTEND_TAG}" >> $GITHUB_OUTPUT
-          echo "📦 Backend:  ${BACKEND_TAG}"
-          echo "📦 Frontend: ${FRONTEND_TAG}"
+          echo "Backend:  ${BACKEND_TAG}"
+          echo "Frontend: ${FRONTEND_TAG}"
 
-      - name: Update values-prd.yaml
+      - name: Update values-prd.yaml (yq — 정확한 path)
         run: |
           BACKEND_TAG="${{ steps.tags.outputs.backend_tag }}"
           FRONTEND_TAG="${{ steps.tags.outputs.frontend_tag }}"
           VALUES_FILE="charts/{{APP_NAME}}/values-prd.yaml"
 
-          sed -i '/^backend:/,/^frontend:/ s/tag: .*/tag: "'"${BACKEND_TAG}"'"/' ${VALUES_FILE}
-          sed -i '/^frontend:/,$ s/tag: .*/tag: "'"${FRONTEND_TAG}"'"/' ${VALUES_FILE}
+          yq e -i ".backend.image.tag = \"$BACKEND_TAG\"" "$VALUES_FILE"
+          yq e -i ".frontend.image.tag = \"$FRONTEND_TAG\"" "$VALUES_FILE"
 
           echo "Updated → Backend: ${BACKEND_TAG}, Frontend: ${FRONTEND_TAG}"
 
