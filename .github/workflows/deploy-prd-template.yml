@@ -1,0 +1,139 @@
+# {{APP_NAME}} — Deploy PRD (tag-based promote)
+#
+# 표준 prd 배포 워크플로우. 신규 서비스 온보딩 시 이 템플릿 복사:
+#   1. cp .github/workflows/deploy-prd-template.yml .github/workflows/deploy-prd.yml
+#   2. 파일 내 {{APP_NAME}} 을 실제 서비스명으로 치환
+#   3. components 변수에 컴포넌트명 나열 (예: backend frontend / api web / server client)
+#   4. 첫 dev 검증 후 git tag v0.1.0 && git push --tags 로 첫 release
+#
+# 운영 흐름:
+#   1. main 머지 -> deploy-{component}-dev.yml 이 dev 이미지 빌드/푸시 + values-dev.yaml 갱신
+#   2. dev 검증 완료 -> git tag v1.0.0 && git push --tags
+#   3. 본 워크플로우 자동 실행 -> values-prd.yaml 의 컴포넌트 image tag 를
+#      values-dev.yaml @ tag commit 의 값으로 promote -> commit + push
+#   4. ArgoCD prd Application 자동 sync -> Pod rolling update
+#
+# 롤백 (workflow_dispatch):
+#   Actions UI -> deploy-prd -> Run workflow -> tag: v0.9.0 입력
+#
+# 컴포넌트 추가/변경 시 수정 위치:
+#   - components 변수 (read step)
+#   - yq 갱신 명령 (commit step)
+#   - commit 메시지
+
+name: "{{APP_NAME}} Deploy PRD"
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to deploy (예: v1.0.0). 비워두면 최신 tag 사용.'
+        required: false
+        type: string
+
+permissions:
+  id-token: write
+  contents: write
+
+concurrency:
+  group: "{{APP_NAME}}-deploy-prd"
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote to PRD
+    runs-on: ubuntu-latest
+    environment: prd
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install yq
+        run: sudo snap install yq
+
+      - name: Resolve target tag
+        id: r
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG=$(git describe --tags --abbrev=0)
+          fi
+          if [ -z "$TAG" ]; then
+            echo "ERROR: no tag resolved"
+            exit 1
+          fi
+          if ! git rev-parse --verify "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "ERROR: tag '$TAG' not found"
+            exit 1
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Resolved tag: $TAG"
+
+      - name: Read component image tags from values-dev.yaml @ ${{ steps.r.outputs.tag }}
+        id: img
+        run: |
+          # tag commit 의 values-dev.yaml 임시 추출
+          git show "${{ steps.r.outputs.tag }}:charts/{{APP_NAME}}/values-dev.yaml" > /tmp/values-dev-at-tag.yaml
+
+          # 컴포넌트별 tag 읽기 — 서비스에 맞게 추가/제거
+          # 예시: backend + frontend 2-컴포넌트 구성
+          BACKEND_TAG=$(yq '.backend.image.tag' /tmp/values-dev-at-tag.yaml)
+          FRONTEND_TAG=$(yq '.frontend.image.tag' /tmp/values-dev-at-tag.yaml)
+
+          # null/empty 검증
+          for pair in "backend:$BACKEND_TAG" "frontend:$FRONTEND_TAG"; do
+            name="${pair%%:*}"
+            value="${pair#*:}"
+            if [ "$value" = "null" ] || [ -z "$value" ]; then
+              echo "ERROR: $name.image.tag missing in values-dev.yaml at ${{ steps.r.outputs.tag }}"
+              exit 1
+            fi
+          done
+
+          echo "backend_tag=$BACKEND_TAG" >> $GITHUB_OUTPUT
+          echo "frontend_tag=$FRONTEND_TAG" >> $GITHUB_OUTPUT
+          echo "Promoting backend=$BACKEND_TAG, frontend=$FRONTEND_TAG"
+
+      - name: Promote to values-prd.yaml + commit (with retry on race)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+
+            # 컴포넌트별 yq 갱신 — 서비스에 맞게 추가/제거
+            yq -i '.backend.image.tag = "${{ steps.img.outputs.backend_tag }}" |
+                   .frontend.image.tag = "${{ steps.img.outputs.frontend_tag }}"' \
+              charts/{{APP_NAME}}/values-prd.yaml
+
+            if git diff --quiet charts/{{APP_NAME}}/values-prd.yaml; then
+              echo "no change — values-prd.yaml already at ${{ steps.r.outputs.tag }}"
+              exit 0
+            fi
+            git add charts/{{APP_NAME}}/values-prd.yaml
+            git commit -m "chore(prd): {{APP_NAME}} promote to ${{ steps.r.outputs.tag }} (backend=${{ steps.img.outputs.backend_tag }}, frontend=${{ steps.img.outputs.frontend_tag }})"
+            if git push origin main; then
+              echo "push success (attempt $attempt)"
+              exit 0
+            fi
+            echo "push race detected, retrying (attempt $attempt)"
+            sleep $((attempt * 2))
+          done
+          echo "push failed after 5 attempts"
+          exit 1
+
+      - name: Summary
+        run: |
+          echo "🚀 {{APP_NAME}} PRD Promote Complete"
+          echo "Tag:      ${{ steps.r.outputs.tag }}"
+          echo "Backend:  ${{ steps.img.outputs.backend_tag }}"
+          echo "Frontend: ${{ steps.img.outputs.frontend_tag }}"
+          echo "ArgoCD will automatically sync values-prd.yaml change."
