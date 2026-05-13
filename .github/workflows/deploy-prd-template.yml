@@ -50,10 +50,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install yq
         run: sudo snap install yq
+
+      - name: Ensure tags fetched (workflow_dispatch 시 main checkout 되어 tag 누락 가능)
+        run: git fetch origin --tags --force
 
       - name: Resolve target tag
         id: r
@@ -79,8 +83,19 @@ jobs:
       - name: Read component image tags from values-dev.yaml @ ${{ steps.r.outputs.tag }}
         id: img
         run: |
-          # tag commit 의 values-dev.yaml 임시 추출
-          git show "${{ steps.r.outputs.tag }}:charts/{{APP_NAME}}/values-dev.yaml" > /tmp/values-dev-at-tag.yaml
+          set -euo pipefail
+          # tag commit 의 values-dev.yaml 추출 (silent 실패 방지)
+          if ! git show "${{ steps.r.outputs.tag }}:charts/{{APP_NAME}}/values-dev.yaml" > /tmp/values-dev-at-tag.yaml 2>/tmp/git-show.err; then
+            echo "ERROR: git show failed for tag '${{ steps.r.outputs.tag }}'"
+            cat /tmp/git-show.err
+            echo "--- Available tags: ---"
+            git tag --list | head -20
+            exit 1
+          fi
+          if [ ! -s /tmp/values-dev-at-tag.yaml ]; then
+            echo "ERROR: extracted values-dev.yaml is empty"
+            exit 1
+          fi
 
           # 컴포넌트별 tag 읽기 — 서비스에 맞게 추가/제거
           # 예시: backend + frontend 2-컴포넌트 구성
