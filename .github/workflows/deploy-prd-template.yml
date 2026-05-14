@@ -122,7 +122,10 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           for attempt in 1 2 3 4 5; do
             git fetch origin main
-            git reset --hard origin/main
+            # tag push trigger 시 detached HEAD 상태. local main branch ref 가
+            # 없으므로 `git push origin main` 이 "src refspec main does not match
+            # any" 로 실패. -B 로 명시적으로 main branch 생성 + origin/main 위치.
+            git checkout -B main origin/main
 
             # 컴포넌트별 yq 갱신 — 서비스에 맞게 추가/제거
             yq -i '.backend.image.tag = "${{ steps.img.outputs.backend_tag }}" |
@@ -135,7 +138,8 @@ jobs:
             fi
             git add charts/{{APP_NAME}}/values-prd.yaml
             git commit -m "chore(prd): {{APP_NAME}} promote to ${{ steps.r.outputs.tag }} (backend=${{ steps.img.outputs.backend_tag }}, frontend=${{ steps.img.outputs.frontend_tag }})"
-            if git push origin main; then
+            # HEAD:main 명시로 detached HEAD 라도 동작 — 안전망 2단계
+            if git push origin HEAD:main; then
               echo "push success (attempt $attempt)"
               exit 0
             fi
