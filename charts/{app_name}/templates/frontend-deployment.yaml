@@ -31,6 +31,22 @@ spec:
         admission.datadoghq.com/{{ "{{ .Values.frontend.apm.language }}" }}-lib.version: {{ "{{ .Values.frontend.apm.libVersion | quote }}" }}
       {{- "{{ end }}" }}
     spec:
+      # AZ + 노드 분산 — 한 노드/AZ 다운 시 single point of failure 방지
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ "{{ include \"app.fullname\" . }}" }}-frontend
+              app.kubernetes.io/component: frontend
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ "{{ include \"app.fullname\" . }}" }}-frontend
+              app.kubernetes.io/component: frontend
       containers:
         - name: frontend
           image: "{{ "{{ .Values.frontend.image.repository }}" }}:{{ "{{ .Values.frontend.image.tag }}" }}"

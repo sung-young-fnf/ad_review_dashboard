@@ -31,6 +31,23 @@ spec:
         admission.datadoghq.com/{{ "{{ .Values.backend.apm.language }}" }}-lib.version: {{ "{{ .Values.backend.apm.libVersion | quote }}" }}
       {{- "{{ end }}" }}
     spec:
+      # AZ + 노드 분산 — 한 노드/AZ 다운 시 single point of failure 방지
+      # whenUnsatisfiable: ScheduleAnyway — 노드 수 부족 시 schedule 막지 않음 (strict 아님)
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ "{{ include \"app.fullname\" . }}" }}-backend
+              app.kubernetes.io/component: backend
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ "{{ include \"app.fullname\" . }}" }}-backend
+              app.kubernetes.io/component: backend
       {{- "{{ if .Values.backend.migration.enabled }}" }}
       initContainers:
         - name: db-migrate
