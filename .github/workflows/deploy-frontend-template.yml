@@ -117,6 +117,7 @@ jobs:
           TAG="${{ needs.setup.outputs.image_tag }}"
           # 동시 머지로 다른 chore 커밋이 끼어들면 같은 줄 rebase 충돌 -> silent 실패 (cloud-portal 2026-06-10 사례).
           # 매 시도마다 fresh origin 위에 태그 변경을 재적용하고, 소진 시 명시적으로 실패시킨다.
+          git checkout -- . # 앞 step 의 sed 변경 폐기 (루프 안에서 재적용) — dirty tree 면 checkout -B 거부됨
           for i in {1..5}; do
             git fetch origin ${{ github.ref_name }}
             git checkout -B ${{ github.ref_name }} origin/${{ github.ref_name }}
