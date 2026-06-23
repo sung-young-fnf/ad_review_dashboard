@@ -31,12 +31,20 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Bearer 토큰에서 사용자 추출 — BFF proxy가 전달한 JWT"""
+    """Bearer 토큰에서 사용자 추출 — BFF proxy가 전달한 JWT
+
+    SSO email 흐름: NextAuth(token.email) → session.user.email → BFF → 여기.
+      ① Bearer JWT 검증 시: payload 의 email → preferred_username → upn 순으로 추출.
+         Entra(Azure AD) 는 email claim 이 비어있고 preferred_username/upn 에 오는 경우가 많다.
+      ② BFF 가 X-Auth-Email 헤더로 직접 전달하는 패턴(관리 UI 등)도 가능.
+      두 경우 모두 email 이 빈 값/"unknown" 이면 401 로 거부 — 조용히 'unknown' user 를 만들지 말 것.
+    """
     token = credentials.credentials
 
     # TODO: JWT 검증 (python-jose 또는 pyjwt)
     # payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    # user_id = payload.get("sub")
+    # email = payload.get("email") or payload.get("preferred_username") or payload.get("upn")
+    # if not email: raise HTTPException(401, "email claim 누락 (재로그인 필요)")  # unknown 저장 금지
 
     # Placeholder: 토큰에서 user_id 추출 후 DB 조회
     # 실제 구현 시 JWT 검증 + DB 조회로 교체

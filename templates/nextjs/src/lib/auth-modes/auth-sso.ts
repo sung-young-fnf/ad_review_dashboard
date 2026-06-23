@@ -73,11 +73,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, account }) {
-      // 최초 로그인: account에서 토큰 추출
+    // ── SSO email 흐름 (필독) ───────────────────────────────────────────
+    // NextAuth(token.email) → session.user.email → BFF X-Auth-Email 헤더 → backend user
+    // Entra(Azure AD) 는 표준 email claim 이 비어있는 경우가 많아(profile.email=null)
+    // preferred_username / upn 을 fallback 으로 써야 email 이 backend 까지 흐른다.
+    // 이 매핑을 빠뜨리면 backend 에서 사용자가 'unknown' 으로 잡힌다.
+    async jwt({ token, account, profile }) {
+      // 최초 로그인: account에서 토큰 추출 + 이메일 캡처
       if (account) {
+        const p = (profile ?? {}) as { email?: string; preferred_username?: string; upn?: string };
+        const email = p.email ?? p.preferred_username ?? p.upn ?? token.email ?? null;
         return {
           ...token,
+          email,
           accessToken: account.id_token,
           refreshToken: account.refresh_token,
           accessTokenExpires: account.expires_at ? account.expires_at * 1000 : Date.now() + 3600000,
@@ -95,6 +103,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       session.accessToken = token.accessToken;
       session.error = token.error;
+      // token.email → session.user.email (BFF 가 X-Auth-Email 로 backend 에 전달)
+      if (session.user && token.email) {
+        session.user.email = token.email as string;
+      }
       return session;
     },
   },

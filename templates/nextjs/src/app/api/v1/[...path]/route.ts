@@ -44,6 +44,11 @@ async function proxyRequest(
 
     const headers = new Headers();
     headers.set('Authorization', `Bearer ${session.accessToken}`);
+    // SSO email 흐름: session.user.email → X-Auth-Email 헤더로 backend 전달.
+    // (NextAuth jwt/session callback 에서 Entra email(preferred_username/upn fallback)을
+    //  token.email→session.user.email 로 매핑해야 여기서 값이 채워진다. 누락 시 backend 가
+    //  사용자를 'unknown' 으로 잡으므로, backend 는 빈 값/unknown 이면 거부하도록 구현할 것.)
+    if (session.user?.email) headers.set('X-Auth-Email', session.user.email);
 
     const contentType = request.headers.get('content-type');
     if (contentType) headers.set('Content-Type', contentType);
