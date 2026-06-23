@@ -65,7 +65,7 @@ frontend:
     repository: ""
     tag: latest
     pullPolicy: IfNotPresent
-  port: 3000
+  port: {{FRONTEND_PORT}}
   # Datadog APM auto-instrumentation (Next.js = js-lib)
   apm:
     enabled: true
@@ -91,20 +91,20 @@ frontend:
   startupProbe:
     httpGet:
       path: /api/health
-      port: 3000
+      port: {{FRONTEND_PORT}}
     periodSeconds: 10
     timeoutSeconds: 3
     failureThreshold: 30
   livenessProbe:
     httpGet:
       path: /api/health
-      port: 3000
+      port: {{FRONTEND_PORT}}
     initialDelaySeconds: 30
     periodSeconds: 30
   readinessProbe:
     httpGet:
       path: /api/health
-      port: 3000
+      port: {{FRONTEND_PORT}}
     initialDelaySeconds: 10
     periodSeconds: 10
 
