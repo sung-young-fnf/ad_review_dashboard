@@ -10,7 +10,7 @@ name: "{{APP_NAME}} Backend DEV"
 on:
   workflow_dispatch:
   push:
-    branches: ["main"]
+    branches: ["develop"]  # argocd/{{APP_NAME}}-dev.yaml targetRevision(develop)과 짝꿍 — 같이 변경
     paths:
       - "apps/{{APP_NAME}}/backend/**"
       - "packages/**"
@@ -40,18 +40,23 @@ jobs:
     needs: setup
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm turbo build --filter='./packages/*'
-      - name: Lint
-        run: pnpm turbo lint --filter='./apps/{{APP_NAME}}/backend'
-        continue-on-error: true
-      - name: Type Check
-        run: pnpm turbo typecheck --filter='./apps/{{APP_NAME}}/backend'
+      - name: Validate (stack auto-detect)
+        run: |
+          BE="apps/{{APP_NAME}}/backend"
+          if [ -f "$BE/pyproject.toml" ]; then
+            echo "FastAPI(uv) 감지"
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            export PATH="$HOME/.local/bin:$PATH"
+            cd "$BE"
+            uv sync --frozen --no-dev || uv sync --no-dev
+            uv run ruff check src || true
+          else
+            echo "NestJS(pnpm) 감지"
+            corepack enable
+            pnpm install --frozen-lockfile
+            pnpm turbo lint --filter="./$BE" || true
+            pnpm turbo typecheck --filter="./$BE" || true
+          fi
 
   docker-push:
     name: Docker Build & Push

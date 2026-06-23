@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Dependencies first (better layer caching)
 COPY apps/{{APP_NAME}}/backend/pyproject.toml apps/{{APP_NAME}}/backend/uv.lock* ./
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Cache bust ARG
 ARG CACHEBUST=1

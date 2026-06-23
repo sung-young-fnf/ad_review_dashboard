@@ -10,7 +10,7 @@ name: "{{APP_NAME}} Frontend DEV"
 on:
   workflow_dispatch:
   push:
-    branches: ["main"]
+    branches: ["develop"]
     paths:
       - "apps/{{APP_NAME}}/frontend/**"
       - "packages/**"
