@@ -60,6 +60,8 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // ALB 등 리버스 프록시 뒤 host 신뢰 (signOut redirect /undefined 방지)
+  trustHost: true,
   providers: [
     AzureAD({
       clientId: process.env.AZURE_AD_CLIENT_ID!,
@@ -73,6 +75,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    // ALB(리버스 프록시) 뒤 — host 신뢰 (없으면 signOut redirect /undefined). SSO 모드 공통
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
+      try { if (new URL(url).origin === baseUrl) return url; } catch { /* */ }
+      return baseUrl;
+    },
     // ── SSO email 흐름 (필독) ───────────────────────────────────────────
     // NextAuth(token.email) → session.user.email → BFF X-Auth-Email 헤더 → backend user
     // Entra(Azure AD) 는 표준 email claim 이 비어있는 경우가 많아(profile.email=null)
