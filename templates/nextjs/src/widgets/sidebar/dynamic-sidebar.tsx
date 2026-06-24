@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { signOut } from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
 import { ChevronDown, ChevronRight, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DynamicIcon } from './dynamic-icon';
@@ -57,6 +57,7 @@ function MenuItem({ item, pathname, depth = 0 }: { item: MenuTreeNode; pathname:
 
 export function DynamicSidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession(); // SSO 로그인 사용자 표시 (email)
   const { menus, loading } = useMenuTree();
 
   return (
@@ -81,6 +82,17 @@ export function DynamicSidebar() {
 
       {/* Footer */}
       <div className="border-t p-2">
+        {/* SSO 로그인 사용자 표시 — email 없으면 재로그인 안내 */}
+        {session?.user && (
+          <div className="px-3 pb-2">
+            <div className="truncate text-sm font-medium" title={session.user.email ?? ''}>
+              {session.user.email || session.user.name || '이메일 없음'}
+            </div>
+            {!session.user.email && (
+              <div className="text-xs text-red-500">SSO email 누락 — 다시 로그인하세요</div>
+            )}
+          </div>
+        )}
         <button
           onClick={() => signOut({ callbackUrl: '/login' })}
           className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent transition-colors"
