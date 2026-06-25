@@ -66,6 +66,10 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ include "app.fullname" . }}-backend-env
+          {{- with .Values.backend.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.backend.startupProbe }}
           startupProbe:
             {{- toYaml . | nindent 12 }}
