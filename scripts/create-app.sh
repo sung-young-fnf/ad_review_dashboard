@@ -272,10 +272,14 @@ if [[ "$SSO_ENABLED" == "true" ]]; then
     cat >> "$APP_DIR/backend/.env.example" << EOF
 
 # Microsoft Entra ID SSO
+# ENTRA_TENANT_ID/ENTRA_CLIENT_ID 설정 시 backend(security/auth.py)가 Bearer id_token 을
+# JWKS 로 실제 서명 검증한다. (ENTRA_CLIENT_ID = JWT aud — 채우면 audience 까지 검증)
 $(echo "${APP_SNAKE}" | tr '[:lower:]' '[:upper:]')_ENTRA_CLIENT_ID=your-client-id
 $(echo "${APP_SNAKE}" | tr '[:lower:]' '[:upper:]')_ENTRA_CLIENT_SECRET=your-client-secret
 $(echo "${APP_SNAKE}" | tr '[:lower:]' '[:upper:]')_ENTRA_TENANT_ID=your-tenant-id
 $(echo "${APP_SNAKE}" | tr '[:lower:]' '[:upper:]')_ENTRA_REDIRECT_URI=http://localhost:${FRONTEND_PORT}/api/auth/callback
+# 개발 편의(운영 금지): JWT 없이 BFF 의 X-Auth-Email 헤더만 신뢰하려면 true.
+# $(echo "${APP_SNAKE}" | tr '[:lower:]' '[:upper:]')_AUTH_TRUST_EMAIL_HEADER=false
 EOF
   else
     cat >> "$APP_DIR/backend/.env.example" << EOF

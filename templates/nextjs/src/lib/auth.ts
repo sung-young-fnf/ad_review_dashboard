@@ -66,7 +66,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     AzureAD({
       clientId: process.env.AZURE_AD_CLIENT_ID!,
       clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
-      tenantId: process.env.AZURE_AD_TENANT_ID!,
+      // next-auth v5 의 entra/azure-ad provider 는 tenantId 옵션을 제거했다 — issuer 로 테넌트 지정.
+      // (tenantId 사용 시 tsc TS2353: 'tenantId' does not exist 로 빌드 깨짐)
+      issuer: `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/v2.0`,
       authorization: {
         params: {
           scope: 'openid profile email User.Read offline_access',

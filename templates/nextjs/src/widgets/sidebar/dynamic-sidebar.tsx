@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { signOut, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { ChevronDown, ChevronRight, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DynamicIcon } from './dynamic-icon';
@@ -93,13 +93,18 @@ export function DynamicSidebar() {
             )}
           </div>
         )}
-        <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
+        {/*
+          Federated logout: 클라이언트 signOut() 은 앱 세션만 지워 IdP SSO 세션이 남는다
+          (로그아웃 후 즉시 재로그인 문제). /api/auth/federated-logout 가 앱 세션 종료 +
+          Entra logout endpoint redirect 까지 처리하므로, 단순 링크 이동으로 위임한다.
+        */}
+        <a
+          href="/api/auth/federated-logout"
           className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent transition-colors"
         >
           <LogOut className="h-4 w-4" />
           <span>로그아웃</span>
-        </button>
+        </a>
       </div>
     </aside>
   );
