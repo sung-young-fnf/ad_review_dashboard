@@ -84,4 +84,13 @@ YAGNI | DRY | NO PARTIAL | NO DEAD CODE
 ## Guides
 - `.claude/guides/` — 기술 가이드
 - `.claude/rules/` — 품질/워크플로우 규칙
+- `docs/STANDARD-DOCS.md` — **서비스 레포 표준 문서 구조 + AI 거버넌스** (MANDATORY)
 - `docs/DBUSER-POLICY.md` — DB 계정 정책
+- `docs/API-USAGE.template.md` — 신규 서비스 API 가이드 작성 template
+- `docs/OPS.template.md` — 신규 서비스 운영 가이드 작성 template
+
+## 서비스 레포 표준 docs (MANDATORY)
+모든 서비스 레포는 `docs/STANDARD-DOCS.md` 의 구조를 따른다 — README.md / CLAUDE.md / docs/API-USAGE.md / docs/OPS.md 표준 위치. AI 에이전트(brown.alter 등)가 서비스 기술 질문 받을 때 *추정 답변 금지*, 다음 순서로 fetch:
+1. `{service}/CLAUDE.md` — Docs Index 확인
+2. `docs/{TOPIC}.md` (API-USAGE / OPS / ARCHITECTURE 등)
+3. Swagger OpenAPI (`<base>/openapi.json`) — 정확한 schema
