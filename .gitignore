@@ -39,3 +39,6 @@ docker-compose.override.yml
 
 # Misc
 *.log
+
+# Tasks (로컬 브리핑용, 커밋 제외)
+TASKS.md
