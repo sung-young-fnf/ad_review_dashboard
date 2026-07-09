@@ -74,6 +74,11 @@ async function proxyRequest(
       });
     }
 
+    // 본문 없는 상태(204/205/304) — body 를 넣으면 Response 생성이 throw 됨(→ 502 오인)
+    if (response.status === 204 || response.status === 205 || response.status === 304) {
+      return new NextResponse(null, { status: response.status });
+    }
+
     // JSON 응답
     const data = await response.arrayBuffer();
     return new NextResponse(data, {
