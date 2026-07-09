@@ -16,6 +16,10 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     } catch {
       /* non-json error */
     }
+    // 세션 만료/토큰 갱신 실패 → 전역 이벤트 발행 (레이아웃의 SessionExpiry 패널이 수신)
+    if (res.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('adv:auth-expired'));
+    }
     const err = new Error(detail) as ApiError;
     err.status = res.status;
     throw err;
