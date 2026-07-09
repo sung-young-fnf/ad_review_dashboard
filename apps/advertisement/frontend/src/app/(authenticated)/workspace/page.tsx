@@ -19,6 +19,7 @@ export default function WorkspacePage() {
   const [allVideos, setAllVideos] = useState<Video[]>([]);
   const [openIds, setOpenIds] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [restored, setRestored] = useState(false); // 복원 완료 전엔 저장 금지(초기 [] 덮어쓰기 방지)
 
   const [activeVideo, setActiveVideo] = useState<Video | null>(null);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -68,18 +69,21 @@ export default function WorkspacePage() {
     }
     setOpenIds(ids);
     setActiveId(active);
+    setRestored(true);
   }, []);
 
-  // ── 탭 상태 유지: URL + localStorage 동기화 ──
+  // ── 탭 상태 유지: URL + localStorage 동기화 (복원 완료 후에만) ──
   useEffect(() => {
+    if (!restored) return;
     const qs = openIds.length ? `?ids=${openIds.join(',')}` : '';
     window.history.replaceState(null, '', `/workspace${qs}`);
     localStorage.setItem('adv_ws_open', openIds.join(','));
-  }, [openIds]);
+  }, [openIds, restored]);
 
   useEffect(() => {
+    if (!restored) return;
     localStorage.setItem('adv_ws_active', activeId ?? '');
-  }, [activeId]);
+  }, [activeId, restored]);
 
   const reloadActive = useCallback((videoId: string) => {
     setLoadingActive(true);
