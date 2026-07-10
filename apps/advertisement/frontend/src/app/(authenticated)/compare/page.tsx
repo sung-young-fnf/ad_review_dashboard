@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Play, Pause, RotateCcw, X, Plus, Film, Sparkles } from 'lucide-react';
 import { apiGet } from '@/lib/api';
-import type { Video, GeneratedVideo } from '@/lib/types';
+import type { Video, Prompt } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { toast } from '@/components/ui/toaster';
@@ -16,28 +16,50 @@ interface Item {
   play_url: string | null;
 }
 
+// 원본 영상별로 하위 AI 영상을 묶어서 표시하기 위한 그룹
+interface Group {
+  video: Video;
+  original: Item;
+  ai: { item: Item; promptTitle: string }[];
+}
+
 const SPEEDS = [1, 0.5, 0.3];
 
 export default function ComparePage() {
   const [cols, setCols] = useState(2);
   const [speed, setSpeed] = useState(1);
   const [slots, setSlots] = useState<(Item | null)[]>([null, null]);
-  const [items, setItems] = useState<Item[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [pickerFor, setPickerFor] = useState<number | null>(null);
 
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
-  // load selectable items (originals + generated)
+  // 원본 영상 + 각 영상의 프롬프트별 AI 영상을 계층으로 로드
   useEffect(() => {
-    Promise.all([apiGet<Video[]>('/videos'), apiGet<GeneratedVideo[]>('/generated-videos')])
-      .then(([videos, gens]) => {
-        const merged: Item[] = [
-          ...videos.map((v) => ({ id: v.id, kind: 'original' as const, title: v.title, play_url: v.play_url })),
-          ...gens.map((g) => ({ id: g.id, kind: 'generated' as const, title: g.title, play_url: g.play_url })),
-        ];
-        setItems(merged);
-      })
-      .catch((e) => toast.error(`목록 로드 실패: ${e.message}`));
+    (async () => {
+      try {
+        const videos = await apiGet<Video[]>('/videos');
+        const gs = await Promise.all(
+          videos.map(async (v) => {
+            const prompts = await apiGet<Prompt[]>(`/videos/${v.id}/prompts`);
+            const ai = prompts.flatMap((p) =>
+              p.generated_videos.map((g) => ({
+                item: { id: g.id, kind: 'generated' as const, title: g.title, play_url: g.play_url },
+                promptTitle: p.title,
+              })),
+            );
+            return {
+              video: v,
+              original: { id: v.id, kind: 'original' as const, title: v.title, play_url: v.play_url },
+              ai,
+            };
+          }),
+        );
+        setGroups(gs);
+      } catch (e) {
+        toast.error(`목록 로드 실패: ${(e as Error).message}`);
+      }
+    })();
   }, []);
 
   // adjust slots when column count changes
@@ -184,34 +206,63 @@ export default function ComparePage() {
         title="영상 선택"
         description="원본 또는 AI 영상을 이 열에 배치합니다."
       >
-        {items.length === 0 ? (
+        {groups.length === 0 ? (
           <p className="text-sm text-muted-foreground">선택할 영상이 없습니다.</p>
         ) : (
-          <div className="max-h-96 space-y-1 overflow-y-auto">
-            {items.map((it) => {
-              const used = usedIds.has(it.id);
+          <div className="max-h-96 space-y-4 overflow-y-auto">
+            {groups.map((g) => {
+              const usedO = usedIds.has(g.original.id);
               return (
-                <button
-                  key={`${it.kind}-${it.id}`}
-                  type="button"
-                  disabled={used}
-                  onClick={() => pickerFor !== null && setSlot(pickerFor, it)}
-                  className={cn(
-                    'flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm',
-                    used ? 'cursor-not-allowed opacity-40' : 'hover:bg-muted',
-                  )}
-                >
-                  {it.kind === 'original' ? (
+                <div key={g.video.id}>
+                  {/* 원본 (그룹 헤더 겸 선택 항목) */}
+                  <button
+                    type="button"
+                    disabled={usedO}
+                    onClick={() => pickerFor !== null && setSlot(pickerFor, g.original)}
+                    className={cn(
+                      'flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium',
+                      usedO ? 'cursor-not-allowed opacity-40' : 'hover:bg-muted',
+                    )}
+                  >
                     <Film className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{g.video.title}</span>
+                    <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                      원본{usedO ? ' · 사용중' : ''}
+                    </span>
+                  </button>
+
+                  {/* 이 원본에서 나온 AI 영상 — 세로선 + 들여쓰기로 소속 표시 */}
+                  {g.ai.length > 0 ? (
+                    <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-3">
+                      {g.ai.map(({ item, promptTitle }) => {
+                        const used = usedIds.has(item.id);
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            disabled={used}
+                            onClick={() => pickerFor !== null && setSlot(pickerFor, item)}
+                            className={cn(
+                              'flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm',
+                              used ? 'cursor-not-allowed opacity-40' : 'hover:bg-muted',
+                            )}
+                          >
+                            <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary" />
+                            <span className="max-w-[45%] truncate">{item.title}</span>
+                            <span className="truncate text-xs text-muted-foreground">· {promptTitle}</span>
+                            <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                              AI{used ? ' · 사용중' : ''}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   ) : (
-                    <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+                    <div className="ml-4 border-l border-border py-1 pl-3 text-xs text-muted-foreground">
+                      아직 AI 영상 없음
+                    </div>
                   )}
-                  <span className="truncate">{it.title}</span>
-                  <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                    {it.kind === 'original' ? '원본' : 'AI'}
-                    {used ? ' · 사용중' : ''}
-                  </span>
-                </button>
+                </div>
               );
             })}
           </div>
