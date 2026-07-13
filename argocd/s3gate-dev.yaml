@@ -8,7 +8,7 @@ metadata:
 spec:
   project: s3gate
   source:
-    repoURL: https://github.com/sung-young-fnf/ad_review_dashboard.git
+    repoURL: https://github.com/fnf-process/ad_review_dashboard.git
     targetRevision: develop
     path: charts/s3gate
     helm:
