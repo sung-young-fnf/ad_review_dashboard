@@ -54,7 +54,7 @@ log_debug "STDIN saved to: $STDIN_TEMP (size: $(wc -c < "$STDIN_TEMP"))"
 # 새 프로젝트 감지: SERVICE_CONTEXT.md 없으면 초기화 필요
 # ============================================================================
 
-if [[ -z "$SERVICE_CONTEXT" ]]; then
+if [[ -z "$SERVICE_CONTEXT" && ! -f "$REPO_ROOT/.claude/.project-init-skipped" ]]; then
   log_debug "SERVICE_CONTEXT.md not found - new project detected"
 
   # 사용자가 "프로젝트 초기화" 또는 "스킵"을 입력했는지 확인
